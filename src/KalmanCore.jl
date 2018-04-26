@@ -42,7 +42,7 @@ function kfilter(previous_state::Gaussian, transition_mat, transition_noise::Gau
     r = y - ŷ
     filtered_state = Gaussian(μ + K*r,
                               (I - K*C) * Σ)
-    ll = logpdf(Gaussian(C * μ, Matrix(Hermitian(S))), y)  # log-likelihood
+    ll = logpdf(Gaussian(C * μ, S), y)  # log-likelihood
     return (filtered_state, ll)
 end
 
@@ -52,6 +52,8 @@ function kalman_filter(initial_state::Gaussian, observations::AbstractVector;
                        # "hidden" kwargs to help create defaults
                        _d=dim(initial_state), _N=length(observations),
                        _d₂=length(observations[1]),
+                       # Using `no_noise` twice makes the likelihood blow up.
+                       # The Kalman filter needs at least _some_ noise.
                        transition_mats::AbstractVector=Fill(Eye(_d), _N),
                        transition_noises::AbstractVector{<:Gaussian}=Fill(no_noise(_d), _N),
                        observation_mats::AbstractVector=Fill(Eye(_d₂), _N),
@@ -71,7 +73,7 @@ function kalman_filter(initial_state::Gaussian, observations::AbstractVector;
         filtered_states[i] = state
         total_ll += ll
     end
-    return (filtered_states, ll)
+    return (filtered_states, total_ll)
 end
 
 
