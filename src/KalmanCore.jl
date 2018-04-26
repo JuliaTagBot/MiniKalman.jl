@@ -2,8 +2,9 @@ module KalmanCore
 
 using GaussianDistributions, FillArrays
 using GaussianDistributions: dim, logpdf
+using StaticArrays
 
-export kfilter, kalman_filter
+export kfilter, kalman_filter, white_noise
 
 """ Perform one step of Kalman filtering, for online use. We assume equations:
 
@@ -47,6 +48,7 @@ function kfilter(previous_state::Gaussian, transition_mat, transition_noise::Gau
 end
 
 no_noise(d) = Gaussian(Zeros(d), Zeros(d, d))
+white_noise(vals...) = Gaussian(Zeros(length(vals)), Diagonal(SVector(vals...)))
 
 function kalman_filter(initial_state::Gaussian, observations::AbstractVector;
                        # "hidden" kwargs to help create defaults
