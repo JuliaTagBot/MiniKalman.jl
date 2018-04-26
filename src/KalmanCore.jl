@@ -1,8 +1,11 @@
 module KalmanCore
 
 using GaussianDistributions, FillArrays
+using GaussianDistributions: dim, logpdf
 
-""" Perform one step of Kalman filtering. We assume equations:
+export kfilter, kalman_filter
+
+""" Perform one step of Kalman filtering, for online use. We assume equations:
 
 ```julia
 current_state = transition_mat * previous_state + transition_noise
@@ -13,9 +16,8 @@ and return `current_state::Gaussian`, which is the posterior `P(state|observatio
 
 To add a forcing term, pass it as `transition_noise = Gaussian(forcing_term, noise_cov)`.
 """
-function kfilter(previous_state::Gaussian, observation::AbstractVector,
-                 transition_mat::AbstractMatrix, transition_noise::Gaussian,
-                 observation_mat::AbstractMatrix, observation_noise::Gaussian)
+function kfilter(previous_state::Gaussian, transition_mat, transition_noise::Gaussian,
+                 observation, observation_mat, observation_noise::Gaussian)
     # Following Machine Learning, A probabilistic perspective, by Kevin Murphy, 18.3.1.2,
     # with the exception that I'm setting the forcing term to 0, but allowing noise terms
     # with means. This is mathematically equivalent.
@@ -28,46 +30,50 @@ function kfilter(previous_state::Gaussian, observation::AbstractVector,
     C = observation_mat
     y = observation
 
-    # Prediction step. 
-    predicted_state = M * previous_state + Bu
-    μ = mean(predicted_state)       # = μ_(t|t-1)
-    Σ = cov(predicted_state) + Q    # = Σ_(t|t-1)
+    # Prediction step
+    transitioned_state = A * previous_state + Bu
+    μ = mean(transitioned_state)       # = μ_(t|t-1)
+    Σ = cov(transitioned_state) + Q    # = Σ_(t|t-1)
     
     # Filter
     S = C * Σ * C' + R
     K = Σ * C' / S         # Kalman gain matrix
     ŷ = C * μ + Du
     r = y - ŷ
-    ll = logpdf(Gaussian(C * μ, S), y)  # log-likelihood
-    return (Gaussian(μ + K*r,
-                     (I - K*C) * Σ),
-            ll)
+    filtered_state = Gaussian(μ + K*r,
+                              (I - K*C) * Σ)
+    ll = logpdf(Gaussian(C * μ, Matrix(Hermitian(S))), y)  # log-likelihood
+    return (filtered_state, ll)
 end
 
+no_noise(d) = Gaussian(Zeros(d), Zeros(d, d))
+
 function kalman_filter(initial_state::Gaussian, observations::AbstractVector;
-                       # "hidden" variables to create defaults
-                       _d=size(initial_state), _N=length(observations),
+                       # "hidden" kwargs to help create defaults
+                       _d=dim(initial_state), _N=length(observations),
                        _d₂=length(observations[1]),
                        transition_mats::AbstractVector=Fill(Eye(_d), _N),
-                       transition_noises::AbstractVector{Gaussian}=Fill(no_noise(_d), _N),
-                       observation_mats::AbstractVector=Fill(Gaussian, _N),
-                       observation_noises::AbstractVector{Gaussian}=Fill(no_noise(_d₂), _N))
+                       transition_noises::AbstractVector{<:Gaussian}=Fill(no_noise(_d), _N),
+                       observation_mats::AbstractVector=Fill(Eye(_d₂), _N),
+                       observation_noises::AbstractVector{<:Gaussian}=Fill(no_noise(_d₂), _N))
     @assert(length(observations) == length(transition_mats) ==
             length(transition_noises) == length(observation_mats) ==
             length(observation_noises),
             "All passed vectors should be of the same length")
     state = initial_state
-    filtered_states = fill(initial_state, N)
+    filtered_states = fill(initial_state, _N)
     total_ll = 0.0
     for (i, (observation, transition_mat, transition_noise, obs_mat, obs_noise)) in
         enumerate(zip(observations, transition_mats, transition_noises,
                       observation_mats, observation_noises))
-        filtered_states[i], ll = kalman_filter(state, observation,
-                                               transition_mat, transition_noise,
-                                               obs_mat, obs_noise)
+        state, ll = kfilter(state, transition_mat, transition_noise,
+                            observation, obs_mat, obs_noise)
+        filtered_states[i] = state
         total_ll += ll
     end
     return (filtered_states, ll)
 end
+
+
 
 end  # module
