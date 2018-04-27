@@ -9,15 +9,15 @@ export kfilter, kalman_filter, white_noise
 """ Perform one step of Kalman filtering, for online use. We assume equations:
 
 ```julia
-current_state = transition_mat * previous_state + transition_noise
+current_state = transition_mat * state_prior + transition_noise
 observation = observation_mat * current_state + observation_noise
 ```
 
 and return `current_state::Gaussian`, which is the posterior `P(state|observation)`.
 
-To add a forcing term, pass it as `transition_noise = Gaussian(forcing_term, noise_cov)`.
+To add an "input" term, pass it as `transition_noise = Gaussian(input_term, noise_cov)`.
 """
-function kfilter(previous_state::Gaussian, transition_mat, transition_noise::Gaussian,
+function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussian,
                  observation, observation_mat, observation_noise::Gaussian)
     # Following Machine Learning, A probabilistic perspective, by Kevin Murphy, 18.3.1.2,
     # with the exception that I'm setting the forcing term to 0, but allowing noise terms
@@ -32,7 +32,7 @@ function kfilter(previous_state::Gaussian, transition_mat, transition_noise::Gau
     y = observation
 
     # Prediction step
-    transitioned_state = A * previous_state + Bu
+    transitioned_state = A * state_prior + Bu
     μ = mean(transitioned_state)       # = μ_(t|t-1)
     Σ = cov(transitioned_state) + Q    # = Σ_(t|t-1)
     
