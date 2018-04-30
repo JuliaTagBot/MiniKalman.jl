@@ -50,14 +50,16 @@ end
 no_noise(d) = Gaussian(Zeros(d), Zeros(d, d))
 white_noise(vals...) = Gaussian(Zeros(length(vals)), SDiagonal(vals...))
 
-function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector;
+function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
+                       observation_noises::AbstractVector{<:Gaussian};
                        # "hidden" kwargs to help create defaults
                        _d=dim(initial_state_prior), _N=length(observations),
                        _d₂=length(observations[1]),
                        transition_mats::AbstractVector=Fill(Eye(_d), _N),
-                       transition_noises::AbstractVector{<:Gaussian}=Fill(no_noise(_d), _N),
-                       observation_mats::AbstractVector=Fill(Eye(_d₂), _N),
-                       observation_noises::AbstractVector{<:Gaussian}=Fill(no_noise(_d₂), _N))
+                       transition_noises::AbstractVector{<:Gaussian}=
+                           Fill(no_noise(_d), _N),
+                       # The default only makes sense if `d₂==d`
+                       observation_mats::AbstractVector=Fill(Eye(_d₂, _d), _N))
     @assert(length(observations) == length(transition_mats) ==
             length(transition_noises) == length(observation_mats) ==
             length(observation_noises),
@@ -74,7 +76,8 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
     return (filtered_states, total_ll)
 end
 
-""" Compute the 1-step smoothed state at step `t`, given the `t+1`'th smoothed state. """
+""" Compute the smoothed belief state at step `t`, given the `t+1`'th smoothed belief
+state. """
 function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
                    next_transition_mat::AbstractMatrix, next_transition_noise::Gaussian)
     # Deconstruct arguments
