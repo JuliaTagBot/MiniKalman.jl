@@ -80,6 +80,11 @@ end
 state. """
 function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
                    next_transition_mat::AbstractMatrix, next_transition_noise::Gaussian)
+    # Notation:
+    #    ₜ₁ means t+1
+    #    Xₜₜ means (Xₜ|data up to t)
+    #    T means "all data past, present and future"
+
     # Deconstruct arguments
     Aₜ₁ = next_transition_mat
     Buₜ₁ = mean(next_transition_noise)      # = B_t * u_t   (input/control)
@@ -89,11 +94,11 @@ function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
 
     # Predicted state
     transitioned_state = Aₜ₁ * filtered_state + Buₜ₁
-    μₜ₁ₜ = mean(transitioned_state)         # = μ_(t|t-1)
+    μₜ₁ₜ = A * mean(transitioned_state)         # = μ_(t|t-1)
     Σₜ₁ₜ = cov(transitioned_state) + Qₜ₁    # = Σ_(t+1|t)
 
     # Smoothed state
-    J = Σₜₜ * Aₜ₁' / Σₜ₁ₜ
+    J = Σₜₜ * Aₜ₁' / Σₜ₁ₜ       # backwards Kalman gain matrix
     return Gaussian(μₜₜ + J * (μₜ₁T - μₜ₁ₜ),
                     Σₜₜ + J * (Σₜ₁T - Σₜ₁ₜ) * J')
 end
