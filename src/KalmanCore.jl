@@ -54,8 +54,6 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
                        # "hidden" kwargs to help create defaults
                        _d=dim(initial_state_prior), _N=length(observations),
                        _d₂=length(observations[1]),
-                       # Using `no_noise` twice makes the likelihood blow up.
-                       # The Kalman filter needs at least _some_ noise.
                        transition_mats::AbstractVector=Fill(Eye(_d), _N),
                        transition_noises::AbstractVector{<:Gaussian}=Fill(no_noise(_d), _N),
                        observation_mats::AbstractVector=Fill(Eye(_d₂), _N),
@@ -97,28 +95,20 @@ function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
                     Σₜₜ + J * (Σₜ₁T - Σₜ₁ₜ) * J')
 end
 
-function kalman_smoother(initial_state_prior::Gaussian, observations::AbstractVector;
-                         # "hidden" kwargs to help create defaults
-                         _d=dim(initial_state_prior), _N=length(observations),
-                         _d₂=length(observations[1]),
-                         # Using `no_noise` twice makes the likelihood blow up.
-                         # The Kalman filter needs at least _some_ noise.
-                         transition_mats::AbstractVector=Fill(Eye(_d), _N),
-                         transition_noises::AbstractVector{<:Gaussian}=Fill(no_noise(_d), _N),
-                         observation_mats::AbstractVector=Fill(Eye(_d₂), _N),
-                         observation_noises::AbstractVector{<:Gaussian}=Fill(no_noise(_d₂), _N))
-    filtered_states, ll = kalman_filter(initial_state_prior, observations;
-                                        transition_mats=transition_mats,
-                                        transition_noises=transition_noises,
-                                        observation_mats=observation_mats,
-                                        observation_noises=observation_noises)
-    smoothed_states = fill(filtered_states[end], length(observations))
-    for t in length(observations)-1:-1:1
+function kalman_smoother(filtered_states::AbstractVector{<:Gaussian};
+                         transition_mats::AbstractVector=
+                             Fill(Eye(dim(filtered_states[1])), length(filtered_states)),
+                         transition_noises::AbstractVector{<:Gaussian}=
+                             Fill(no_noise(dim(filtered_states[1])),
+                                  length(filtered_states)))
+    smoothed_states = fill(filtered_states[end], length(filtered_states))
+    for t in length(smoothed_states)-1:-1:1
         smoothed_states[t] =
               ksmoother(filtered_states[t], smoothed_states[t+1],
                         transition_mats[t+1], transition_noises[t+1])
     end
-    return filtered_states, smoothed_states, ll
+    return smoothed_states
 end
+
 
 end  # module
