@@ -60,22 +60,22 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
                        transition_mats::AbstractVector=Fill(Eye(_d), _N),
                        transition_noises::AbstractVector{<:Gaussian}=
                            Fill(no_noise(_d), _N),
-                       # The default only makes sense if `d₂==d`
+                       # This default only makes sense if `d₂==d`
                        observation_mats::AbstractVector=Fill(Eye(_d₂, _d), _N))
     @assert(length(observations) == length(transition_mats) ==
             length(transition_noises) == length(observation_mats) ==
             length(observation_noises),
             "All passed vectors should be of the same length")
-    state = initial_state_prior
-    filtered_states = fill(initial_state_prior, _N)
-    total_ll = 0.0   # log-likelihood
-    for t in 1:length(observations)
-        state, ll = kfilter(state, transition_mats[t], transition_noises[t],
-                            observations[t], observation_mats[t], observation_noises[t])
-        filtered_states[t] = state
-        total_ll += ll
+    # We use `accumulate` instead of a dumb loop to benefit from automatic type widening.
+    # This is necessary for ForwardDiff, but it might cause type-stability issues
+    # (I'm not sure). Alternatively, we could use the `promote_type` of all input
+    # matrices as the eltype of the result.
+    result = accumulate((initial_state_prior, 0.0), 1:length(observations)) do v, t
+        state, _ = v
+        kfilter(state, transition_mats[t], transition_noises[t],
+                observations[t], observation_mats[t], observation_noises[t])
     end
-    return (filtered_states, total_ll)
+    return (map(first, result), sum(last, result))
 end
 
 """ Compute the smoothed belief state at step `t`, given the `t+1`'th smoothed belief
