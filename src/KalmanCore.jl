@@ -66,7 +66,7 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
             "All passed vectors should be of the same length")
     state = initial_state_prior
     filtered_states = fill(initial_state_prior, _N)
-    total_ll = 0.0
+    total_ll = 0.0   # log-likelihood
     for t in 1:length(observations)
         state, ll = kfilter(state, transition_mats[t], transition_noises[t],
                             observations[t], observation_mats[t], observation_noises[t])
@@ -76,7 +76,7 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
     return (filtered_states, total_ll)
 end
 
-""" Compute the 1-step smoothed state, given the _next_ smoothed state. """
+""" Compute the 1-step smoothed state at step `t`, given the `t+1`'th smoothed state. """
 function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
                    next_transition_mat::AbstractMatrix, next_transition_noise::Gaussian)
     # Deconstruct arguments
@@ -88,7 +88,7 @@ function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
 
     # Predicted state
     transitioned_state = Aₜ₁ * filtered_state + Buₜ₁
-    μₜ₁ₜ = mean(transitioned_state)       # = μ_(t|t-1)
+    μₜ₁ₜ = mean(transitioned_state)         # = μ_(t|t-1)
     Σₜ₁ₜ = cov(transitioned_state) + Qₜ₁    # = Σ_(t+1|t)
 
     # Smoothed state
