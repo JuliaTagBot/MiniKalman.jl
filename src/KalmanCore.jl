@@ -67,11 +67,9 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
     state = initial_state_prior
     filtered_states = fill(initial_state_prior, _N)
     total_ll = 0.0
-    for (i, (observation, transition_mat, transition_noise, obs_mat, obs_noise)) in
-        enumerate(zip(observations, transition_mats, transition_noises,
-                      observation_mats, observation_noises))
-        state, ll = kfilter(state, transition_mat, transition_noise,
-                            observation, obs_mat, obs_noise)
+    for i in 1:length(observations)
+        state, ll = kfilter(state, transition_mats[i], transition_noises[i],
+                            observations[i], observation_mats[i], observation_noises[i])
         filtered_states[i] = state
         total_ll += ll
     end
