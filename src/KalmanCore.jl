@@ -7,7 +7,7 @@ using StaticArrays
 export kfilter, kalman_filter, white_noise, kalman_smoother
 
 predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussian) =
-    # Helper
+    # Helper. Returning a tuple is more convenient than a Gaussian
     (transition_mat * mean(state_prior) + mean(transition_noise),
      transition_mat * cov(state_prior) * transition_mat' + cov(transition_noise))
 
@@ -88,15 +88,12 @@ function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
 
     # Deconstruct arguments
     Aₜ₁ = next_transition_mat
-    Buₜ₁ = mean(next_transition_noise)      # = B_t * u_t   (input/control)
-    Qₜ₁ = cov(next_transition_noise)
     μₜₜ, Σₜₜ = mean(filtered_state), cov(filtered_state)
     μₜ₁T, Σₜ₁T = mean(next_smoothed_state), cov(next_smoothed_state)
 
-    # Predicted state
-    transitioned_state = Aₜ₁ * filtered_state + Buₜ₁
-    μₜ₁ₜ = Aₜ₁ * mean(transitioned_state)         # = μ_(t|t-1)
-    Σₜ₁ₜ = cov(transitioned_state) + Qₜ₁    # = Σ_(t+1|t)
+    # Prediction step
+    μₜ₁ₜ, Σₜ₁ₜ =
+        predicted_state(filtered_state, next_transition_mat, next_transition_noise)
 
     # Smoothed state
     J = Σₜₜ * Aₜ₁' / Σₜ₁ₜ       # backwards Kalman gain matrix
