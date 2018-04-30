@@ -6,6 +6,11 @@ using StaticArrays
 
 export kfilter, kalman_filter, white_noise, kalman_smoother
 
+predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussian) =
+    # Helper
+    (transition_mat * mean(state_prior) + mean(transition_noise),
+     transition_mat * cov(state_prior) * transition_mat' + cov(transition_noise))
+
 """ Perform one step of Kalman filtering, for online use. We assume equations:
 
 ```julia
@@ -21,20 +26,16 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
                  observation, observation_mat, observation_noise::Gaussian)
     # Following Machine Learning, A probabilistic perspective, by Kevin Murphy, 18.3.1.2,
     # with the exception that I'm setting the forcing term to 0, but allowing noise terms
-    # with means. This is mathematically equivalent.
+    # with means (without loss of generality)
     # TODO: use keyword arguments on 0.7
-    Bu = mean(transition_noise)      # = B_t * u_t   (input/control)
     Du = mean(observation_noise)     # = D_t * u_t
-    Q = cov(transition_noise)
     R = cov(observation_noise)
     A = transition_mat
     C = observation_mat
     y = observation
 
-    # Prediction step
-    transitioned_state = A * state_prior + Bu
-    μ = mean(transitioned_state)       # = μ_(t|t-1)
-    Σ = cov(transitioned_state) + Q    # = Σ_(t|t-1)
+    # Prediction step (μ_(t|t-1), Σ_(t|t-1))
+    μ, Σ = predicted_state(state_prior, transition_mat, transition_noise) 
     
     # Filter
     S = C * Σ * C' + R
@@ -94,7 +95,7 @@ function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
 
     # Predicted state
     transitioned_state = Aₜ₁ * filtered_state + Buₜ₁
-    μₜ₁ₜ = A * mean(transitioned_state)         # = μ_(t|t-1)
+    μₜ₁ₜ = Aₜ₁ * mean(transitioned_state)         # = μ_(t|t-1)
     Σₜ₁ₜ = cov(transitioned_state) + Qₜ₁    # = Σ_(t+1|t)
 
     # Smoothed state
