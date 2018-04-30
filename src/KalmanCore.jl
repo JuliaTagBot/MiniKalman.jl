@@ -4,7 +4,7 @@ using GaussianDistributions, FillArrays
 using GaussianDistributions: dim, logpdf
 using StaticArrays
 
-export kfilter, kalman_filter, white_noise, kalman_smoother, kalman_sample
+export kfilter, kalman_filter, white_noise, kalman_smoother, kalman_sample, no_noise
 
 parameters(g::Gaussian) = mean(g), cov(g)
 
