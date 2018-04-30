@@ -4,7 +4,7 @@ using GaussianDistributions, FillArrays
 using GaussianDistributions: dim, logpdf
 using StaticArrays
 
-export kfilter, kalman_filter, white_noise, kalman_smoother
+export kfilter, kalman_filter, white_noise, kalman_smoother, kalman_sample
 
 parameters(g::Gaussian) = mean(g), cov(g)
 
@@ -115,6 +115,39 @@ function kalman_smoother(filtered_states::AbstractVector{<:Gaussian};
                         transition_mats[t+1], transition_noises[t+1])
     end
     return smoothed_states
+end
+
+################################################################################
+# Sampling
+
+# Technically type piracy, but necessary. FIXME somehow?
+Base.rand(RNG, P::Gaussian{Zeros{T, 1, Tuple{Int64}}}) where T =
+    P.μ + chol(P.Σ)'*randn(RNG, T, length(P.μ))
+
+function kalman_sample(rng::AbstractRNG, initial_state,
+                       observation_noises::AbstractVector{<:Gaussian};
+                       _N=length(observation_noises),
+                       # "hidden" kwargs to help create defaults
+                       _d=length(initial_state), 
+                       _d₂=size(observation_noises, 1),
+                       transition_mats::AbstractVector=Fill(Eye(_d), _N),
+                       transition_noises::AbstractVector{<:Gaussian}=
+                           Fill(no_noise(_d), _N),
+                       # This default only makes sense if `d₂==d`
+                       observation_mats::AbstractVector=Fill(Eye(_d₂, _d), _N))
+    @assert(length(transition_mats) ==
+            length(transition_noises) == length(observation_mats) ==
+            length(observation_noises),
+            "All passed vectors should be of the same length")
+    result = accumulate((initial_state, nothing), 1:_N) do v, t
+        state, _ = v
+        next_state = transition_mats[t] * state +
+            # Need special-case, otherwise PosDefException
+            (transition_noises[t] == no_noise(_d) ? 0.0 : rand(rng, transition_noises[t]))
+        return (next_state,
+                observation_mats[t] * next_state + rand(rng, observation_noises[t]))
+    end
+    return (map(first, result), map(last, result))
 end
 
 
