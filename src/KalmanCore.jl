@@ -77,22 +77,19 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
 end
 
 """ Compute the 1-step smoothed state, given the _next_ smoothed state. """
-function ksmoother(filtered_state::Gaussian, next_filtered_state::Gaussian,
-                   next_smoothed_state::Gaussian,
-                   transition_mat::AbstractMatrix, transition_noise::Gaussian,
-                   next_transition_mat::AbstractMatrix)
+function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
+                   next_transition_noise::Gaussian, next_transition_mat::AbstractMatrix)
     # Deconstruct arguments
-    Aₜ = transition_mat
     Aₜ₁ = next_transition_mat
-    Bu = mean(transition_noise)      # = B_t * u_t   (input/control)
-    Q = cov(transition_noise)
+    Buₜ₁ = mean(next_transition_noise)      # = B_t * u_t   (input/control)
+    Qₜ₁ = cov(next_transition_noise)
     μₜₜ, Σₜₜ = mean(filtered_state), cov(filtered_state)
     μₜ₁T, Σₜ₁T = mean(next_smoothed_state), cov(next_smoothed_state)
 
     # Predicted state
-    transitioned_state = Aₜ₁ * filtered_state + Bu
+    transitioned_state = Aₜ₁ * filtered_state + Buₜ₁
     μₜ₁ₜ = mean(transitioned_state)       # = μ_(t|t-1)
-    Σₜ₁ₜ = cov(transitioned_state) + Q    # = Σ_(t+1|t)
+    Σₜ₁ₜ = cov(transitioned_state) + Qₜ₁    # = Σ_(t+1|t)
 
     # Smoothed state
     J = Σₜₜ * Aₜ₁ * Σₜ₁ₜ
@@ -118,9 +115,8 @@ function kalman_smoother(initial_state_prior::Gaussian, observations::AbstractVe
     smoothed_states = fill(filtered_states[end], length(observations))
     for t in length(observations)-1:-1:1
         smoothed_states[t] =
-              ksmoother(filtered_states[t], filtered_states[t+1],
-                        smoothed_states[t+1],
-                        transition_mats[t], transition_noises[t], transition_mats[t+1])
+              ksmoother(filtered_states[t], smoothed_states[t+1],
+                        transition_noises[t+1], transition_mats[t+1])
     end
     return filtered_states, smoothed_states, ll
 end
