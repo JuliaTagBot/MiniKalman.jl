@@ -6,6 +6,8 @@ using StaticArrays
 
 export kfilter, kalman_filter, white_noise, kalman_smoother
 
+parameters(g::Gaussian) = mean(g), cov(g)
+
 predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussian) =
     # Helper. Returning a tuple is more convenient than a Gaussian
     (transition_mat * mean(state_prior) + mean(transition_noise),
@@ -28,8 +30,7 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
     # with the exception that I'm setting the forcing term to 0, but allowing noise terms
     # with means (without loss of generality)
     # TODO: use keyword arguments on 0.7
-    Du = mean(observation_noise)     # = D_t * u_t
-    R = cov(observation_noise)
+    Du, R = parameters(observation_noise)     # Du := Dₜuₜ
     A = transition_mat
     C = observation_mat
     y = observation
@@ -88,8 +89,8 @@ function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
 
     # Deconstruct arguments
     Aₜ₁ = next_transition_mat
-    μₜₜ, Σₜₜ = mean(filtered_state), cov(filtered_state)
-    μₜ₁T, Σₜ₁T = mean(next_smoothed_state), cov(next_smoothed_state)
+    μₜₜ, Σₜₜ = parameters(filtered_state)
+    μₜ₁T, Σₜ₁T = parameters(next_smoothed_state)
 
     # Prediction step
     μₜ₁ₜ, Σₜ₁ₜ =
