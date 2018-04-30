@@ -67,10 +67,10 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
     state = initial_state_prior
     filtered_states = fill(initial_state_prior, _N)
     total_ll = 0.0
-    for i in 1:length(observations)
-        state, ll = kfilter(state, transition_mats[i], transition_noises[i],
-                            observations[i], observation_mats[i], observation_noises[i])
-        filtered_states[i] = state
+    for t in 1:length(observations)
+        state, ll = kfilter(state, transition_mats[t], transition_noises[t],
+                            observations[t], observation_mats[t], observation_noises[t])
+        filtered_states[t] = state
         total_ll += ll
     end
     return (filtered_states, total_ll)
@@ -115,14 +115,14 @@ function kalman_smoother(initial_state_prior::Gaussian, observations::AbstractVe
                                         transition_noises=transition_noises,
                                         observation_mats=observation_mats,
                                         observation_noises=observation_noises)
-    rev_smoothed_states = [filtered_states[end]]
+    smoothed_states = fill(filtered_states[end], length(observations))
     for t in length(observations)-1:-1:1
-        push!(rev_smoothed_states,
+        smoothed_states[t] =
               ksmoother(filtered_states[t], filtered_states[t+1],
-                        rev_smoothed_states[end],
-                        transition_mats[t], transition_noises[t], transition_mats[t+1]))
+                        smoothed_states[t+1],
+                        transition_mats[t], transition_noises[t], transition_mats[t+1])
     end
-    return filtered_states, reverse(rev_smoothed_states), ll
+    return filtered_states, smoothed_states, ll
 end
 
 end  # module
