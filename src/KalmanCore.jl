@@ -78,7 +78,7 @@ end
 
 """ Compute the 1-step smoothed state, given the _next_ smoothed state. """
 function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
-                   next_transition_noise::Gaussian, next_transition_mat::AbstractMatrix)
+                   next_transition_mat::AbstractMatrix, next_transition_noise::Gaussian)
     # Deconstruct arguments
     Aₜ₁ = next_transition_mat
     Buₜ₁ = mean(next_transition_noise)      # = B_t * u_t   (input/control)
@@ -92,7 +92,7 @@ function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
     Σₜ₁ₜ = cov(transitioned_state) + Qₜ₁    # = Σ_(t+1|t)
 
     # Smoothed state
-    J = Σₜₜ * Aₜ₁ * Σₜ₁ₜ
+    J = Σₜₜ * Aₜ₁' / Σₜ₁ₜ
     return Gaussian(μₜₜ + J * (μₜ₁T - μₜ₁ₜ),
                     Σₜₜ + J * (Σₜ₁T - Σₜ₁ₜ) * J')
 end
@@ -116,7 +116,7 @@ function kalman_smoother(initial_state_prior::Gaussian, observations::AbstractVe
     for t in length(observations)-1:-1:1
         smoothed_states[t] =
               ksmoother(filtered_states[t], smoothed_states[t+1],
-                        transition_noises[t+1], transition_mats[t+1])
+                        transition_mats[t+1], transition_noises[t+1])
     end
     return filtered_states, smoothed_states, ll
 end
