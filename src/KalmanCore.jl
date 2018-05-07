@@ -13,6 +13,12 @@ predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussia
     (transition_mat * mean(state_prior) + mean(transition_noise),
      transition_mat * cov(state_prior) * transition_mat' + cov(transition_noise))
 
+function Base.lufact(m::SMatrix)
+    # Necessary until StaticArrays#73
+    lu = lufact(convert(Matrix, m))
+    #return Base.LinAlg.LU(convert(typeof(m), lu.factors), lu.ipiv, lu.info)
+end
+
 """ Perform one step of Kalman filtering, for online use. We assume equations:
 
 ```julia
