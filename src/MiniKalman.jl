@@ -15,7 +15,7 @@ predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussia
 
 function Base.lufact(m::SMatrix)
     # Necessary until StaticArrays#73
-    lu = lufact(convert(Matrix, m))
+    return lufact(convert(Matrix, m))
     #return Base.LinAlg.LU(convert(typeof(m), lu.factors), lu.ipiv, lu.info)
 end
 
