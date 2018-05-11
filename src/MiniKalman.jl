@@ -1,4 +1,4 @@
-module KalmanCore
+module MiniKalman
 
 using GaussianDistributions, FillArrays
 using GaussianDistributions: dim, logpdf
