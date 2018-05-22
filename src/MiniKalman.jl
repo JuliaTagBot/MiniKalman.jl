@@ -148,7 +148,8 @@ function kalman_sample(rng::AbstractRNG, initial_state,
     result = accumulate((initial_state, nothing), 1:_N) do v, t
         state, _ = v
         next_state = transition_mats[t] * state +
-            # Need special-case, otherwise PosDefException
+            # Need special-case, otherwise PosDefException. Perhaps we should
+            # overload `chol(::Zeros)`
             (transition_noises[t] == no_noise(_d) ? 0.0 : rand(rng, transition_noises[t]))
         return (next_state,
                 observation_mats[t] * next_state + rand(rng, observation_noises[t]))
