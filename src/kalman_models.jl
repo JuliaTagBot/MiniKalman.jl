@@ -1,5 +1,6 @@
 using MacroTools, QuickTypes
 using QuickTypes: fieldsof, construct
+using Optim
 
 include("identities.jl")
 
@@ -107,6 +108,24 @@ kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG, initial_state) =
                   transition_noises=transition_noises(m, inputs),
                   observation_mats=observation_mats(m, inputs))
 
+################################################################################
+# Optimization
+""" Finds a set of model parameters that attempts to maximize the log-likelihood
+on the given dataset. Returns `(best_model, optim_object)`. """
+function Optim.optimize(model0::Model, inputs::Inputs,
+                        observations::AbstractVector, initial_state)
+    initial_x = get_params(model0)
+    function objective(params)
+        model = set_params(model0, params)
+        -kalman_filter(model, inputs, observations, initial_state)[2]
+    end
+    td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
+    mins = fill(0.0, length(initial_x))
+    maxes = fill(Inf, length(initial_x))
+    o = optimize(td, initial_x, mins, maxes, Fminbox{LBFGS}())
+    best_model = set_params(model0, Optim.minimizer(o))
+    return (best_model, o)
+end
 
 ################################################################################
 

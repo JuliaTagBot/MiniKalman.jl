@@ -27,7 +27,7 @@ Base.:+(::Zero, x) = x
 
 ################################################################################
 
-parameters(g::Gaussian) = mean(g), cov(g)
+parameters(g::Gaussian) = (mean(g), cov(g))
 
 predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussian) =
     # Helper. Returning a tuple is more convenient than a Gaussian
