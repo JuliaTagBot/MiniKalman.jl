@@ -74,7 +74,6 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
     return (filtered_state, ll)
 end
 
-no_noise(d) = Gaussian(Zeros(d), Zeros(d, d))
 no_noise() = Gaussian(Zero(), Zero())
 white_noise(vals...) = Gaussian(Zeros(length(vals)), SDiagonal(vals...))
 
@@ -85,7 +84,7 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
                        _d₂=length(observations[1]),
                        transition_mats::AbstractVector=Fill(Eye(_d), _N),
                        transition_noises::AbstractVector{<:Gaussian}=
-                           Fill(no_noise(_d), _N),
+                           Fill(no_noise(), _N),
                        # This default only makes sense if `d₂==d`
                        observation_mats::AbstractVector=Fill(Eye(_d₂, _d), _N))
     @assert(length(observations) == length(transition_mats) ==
@@ -132,7 +131,7 @@ function kalman_smoother(filtered_states::AbstractVector{<:Gaussian};
                          transition_mats::AbstractVector=
                              Fill(Eye(dim(filtered_states[1])), length(filtered_states)),
                          transition_noises::AbstractVector{<:Gaussian}=
-                             Fill(no_noise(dim(filtered_states[1])),
+                             Fill(no_noise(),
                                   length(filtered_states)))
     smoothed_states = fill(filtered_states[end], length(filtered_states))
     for t in length(smoothed_states)-1:-1:1
@@ -146,10 +145,16 @@ end
 ################################################################################
 # Sampling
 
-# Technically type piracy, but necessary. FIXME somehow?
+# Technically type piracy, but necessary.
 # This is essentially the definition of sampling from a dirac delta. 
+Base.rand(RNG, P::Gaussian{U, Zeros{T, 2, Tuple{Int64, Int64}}}) where {U, T} = P.μ 
+Base.rand(RNG, P::Gaussian{U, Zero}) where U = P.μ
+
+# Because the GaussianDistributions definitions of rand don't play well with μ = Zeros.
+# FIXME somehow?
 Base.rand(RNG, P::Gaussian{Zeros{T, 1, Tuple{Int64}}}) where T =
-    P.μ + chol(P.Σ)'*randn(RNG, T, length(P.μ))
+   chol(P.Σ)'*randn(RNG, T, length(P.μ))
+
 
 function kalman_sample(rng::AbstractRNG, initial_state,
                        observation_noises::AbstractVector{<:Gaussian};
@@ -159,7 +164,7 @@ function kalman_sample(rng::AbstractRNG, initial_state,
                        _d₂=size(observation_noises, 1),
                        transition_mats::AbstractVector=Fill(Eye(_d), _N),
                        transition_noises::AbstractVector{<:Gaussian}=
-                           Fill(no_noise(_d), _N),
+                           Fill(no_noise(), _N),
                        # This default only makes sense if `d₂==d`
                        observation_mats::AbstractVector=Fill(Eye(_d₂, _d), _N))
     @assert(length(transition_mats) ==
@@ -171,7 +176,7 @@ function kalman_sample(rng::AbstractRNG, initial_state,
         next_state = transition_mats[t] * state +
             # Need special-case, otherwise PosDefException. Perhaps we should
             # overload `chol(::Zeros)`
-            (transition_noises[t] == no_noise(_d) ? 0.0 : rand(rng, transition_noises[t]))
+            (transition_noises[t] == no_noise() ? 0.0 : rand(rng, transition_noises[t]))
         return (next_state,
                 observation_mats[t] * next_state + rand(rng, observation_noises[t]))
     end
