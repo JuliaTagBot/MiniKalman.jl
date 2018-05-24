@@ -79,14 +79,12 @@ white_noise(vals...) = Gaussian(Zeros(length(vals)), SDiagonal(vals...))
 
 function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
                        observation_noises::AbstractVector{<:Gaussian};
-                       # "hidden" kwargs to help create defaults
-                       _d=dim(initial_state_prior), _N=length(observations),
-                       _d₂=length(observations[1]),
-                       transition_mats::AbstractVector=Fill(Eye(_d), _N),
+                       _N=length(observations), # "hidden" kwargs to help create defaults
+                       transition_mats::AbstractVector=Fill(Identity(), _N),
                        transition_noises::AbstractVector{<:Gaussian}=
                            Fill(no_noise(), _N),
                        # This default only makes sense if `d₂==d`
-                       observation_mats::AbstractVector=Fill(Eye(_d₂, _d), _N))
+                       observation_mats::AbstractVector=Fill(Identity(), _N))
     @assert(length(observations) == length(transition_mats) ==
             length(transition_noises) == length(observation_mats) ==
             length(observation_noises),
@@ -129,7 +127,7 @@ end
 
 function kalman_smoother(filtered_states::AbstractVector{<:Gaussian};
                          transition_mats::AbstractVector=
-                             Fill(Eye(dim(filtered_states[1])), length(filtered_states)),
+                             Fill(Identity(), length(filtered_states)),
                          transition_noises::AbstractVector{<:Gaussian}=
                              Fill(no_noise(),
                                   length(filtered_states)))
@@ -158,15 +156,12 @@ Base.rand(RNG, P::Gaussian{Zeros{T, 1, Tuple{Int64}}}) where T =
 
 function kalman_sample(rng::AbstractRNG, initial_state,
                        observation_noises::AbstractVector{<:Gaussian};
-                       _N=length(observation_noises),
-                       # "hidden" kwargs to help create defaults
-                       _d=length(initial_state), 
-                       _d₂=size(observation_noises, 1),
-                       transition_mats::AbstractVector=Fill(Eye(_d), _N),
+                       _N=length(observation_noises), # to help create defaults
+                       transition_mats::AbstractVector=Fill(Identity(), _N),
                        transition_noises::AbstractVector{<:Gaussian}=
                            Fill(no_noise(), _N),
                        # This default only makes sense if `d₂==d`
-                       observation_mats::AbstractVector=Fill(Eye(_d₂, _d), _N))
+                       observation_mats::AbstractVector=Fill(Identity(), _N))
     @assert(length(transition_mats) ==
             length(transition_noises) == length(observation_mats) ==
             length(observation_noises),
