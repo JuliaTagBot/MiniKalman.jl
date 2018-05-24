@@ -56,6 +56,7 @@ end
 
 Base.length(inputs::KalmanInputs) = length(observations(inputs))
 
+################################################################################
 ## Defaults
 transition_mat(inputs::KalmanInputs) = Identity()
 transition_mats(inputs::KalmanInputs) = Fill(transition_mat(inputs), length(inputs))
@@ -67,6 +68,8 @@ observation_noises(inputs::KalmanInputs) = Fill(observation_noise(inputs), lengt
 observation_mat(inputs::KalmanInputs) = Identity()
 observation_mats(inputs::KalmanInputs) = Fill(observation_mat(inputs), length(inputs))
 
+
+################################################################################
 ## Delegations
 
 mk_inputs(model::KalmanModel; kwargs...) = input_type(typeof(model))(model; kwargs...)
