@@ -69,15 +69,26 @@ observation_mats(inputs::KalmanInputs) = Fill(observation_mat(inputs), length(in
 
 ## Delegations
 
-function kalman_filter(model::KalmanModel, initial_state::Gaussian; kwargs...)
-    inputs = input_type(typeof(model))(model; kwargs...)
+mk_inputs(model::KalmanModel; kwargs...) = input_type(typeof(model))(model; kwargs...)
+
+kalman_filter(model::KalmanModel, initial_state; kwargs...) =
+    kalman_filter(mk_inputs(model; kwargs...), initial_state)
+kalman_filter(inputs::KalmanInputs, initial_state) = 
     kalman_filter(initial_state, observations(inputs),
                   observation_noises(inputs);
                   transition_mats=transition_mats(inputs),
                   transition_noises=transition_noises(inputs),
                   observation_mats=observation_mats(inputs))
-end
 
+function kalman_smoother(model::KalmanModel, filtered_states::AbstractArray{<:Gaussian};
+                         kwargs...)
+    inputs = input_type(typeof(model))(model; kwargs...)
+    kalman_smoother(filtered_states;
+                    transition_mats=transition_mats(inputs),
+                    transition_noises=transition_noises(inputs))
+end
+kalman_smoother(model::KalmanModel, initial_state::Gaussian; kwargs...) =
+    kalman_smoother(model, kalman_filter(model, initial_state; kwargs...); kwargs...)
 
 ################################################################################
 
