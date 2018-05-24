@@ -54,6 +54,11 @@ macro kalman_model(def)
     end)
 end
 
+# This definition assumes that the observations are specified, which is obviously
+# wrong when we're sampling. Maybe we should store `N` inside KalmanInputs, and specify
+# it (optionally?) in `mk_inputs`?
+# Alternatively, we could force the user to specify `observation_mats` or
+# `observation_noises`. But I think I like `N` better.
 Base.length(inputs::KalmanInputs) = length(observations(inputs))
 
 ################################################################################
@@ -72,6 +77,7 @@ observation_mats(inputs::KalmanInputs) = Fill(observation_mat(inputs), length(in
 ################################################################################
 ## Delegations
 
+# Rename to `KalmanInputs(model; kwargs...)`?
 mk_inputs(model::KalmanModel; kwargs...) = input_type(typeof(model))(model; kwargs...)
 
 kalman_filter(model::KalmanModel, initial_state; kwargs...) =
