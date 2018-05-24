@@ -17,6 +17,8 @@ export kfilter, kalman_filter, white_noise, kalman_smoother, kalman_sample, no_n
 struct Identity end
 Base.:*(::Identity, x) = x
 Base.:*(x, ::Identity) = x
+Base.:*(g::Gaussian, ::Identity) = g  # disambiguate
+Base.:*(::Identity, g::Gaussian) = g  # disambiguate
 Base.transpose(::Identity) = Identity()
 
 struct Zero end
@@ -154,6 +156,7 @@ Base.rand(RNG, P::Gaussian{Zeros{T, 1, Tuple{Int64}}}) where T =
    chol(P.Σ)'*randn(RNG, T, length(P.μ))
 
 
+""" Returns `(hidden_state::Vector, observations::Vector)` """
 function kalman_sample(rng::AbstractRNG, initial_state,
                        observation_noises::AbstractVector{<:Gaussian};
                        _N=length(observation_noises), # to help create defaults

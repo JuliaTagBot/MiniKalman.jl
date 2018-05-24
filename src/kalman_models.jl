@@ -88,8 +88,7 @@ kalman_smoother(inputs::KalmanInputs, initial_state::Gaussian) =
     kalman_smoother(inputs, kalman_filter(inputs, initial_state)[1])
 
 kalman_sample(inputs::KalmanInputs, rng::AbstractRNG, initial_state) =
-    kalman_sample(rng, initial_state;
-                  observation_noises=observation_noises(inputs),
+    kalman_sample(rng, initial_state, observation_noises(inputs);
                   transition_mats=transition_mats(inputs),
                   transition_noises=transition_noises(inputs),
                   observation_mats=observation_mats(inputs))
