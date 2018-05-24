@@ -57,14 +57,14 @@ end
 Base.length(inputs::KalmanInputs) = length(observations(inputs))
 
 ## Defaults
-transition_mat(inputs::KalmanInputs) = IdentityMat()
+transition_mat(inputs::KalmanInputs) = Identity()
 transition_mats(inputs::KalmanInputs) = Fill(transition_mat(inputs), length(inputs))
 transition_noise(inputs::KalmanInputs) = no_noise()
 transition_noises(inputs::KalmanInputs) = Fill(transition_noise(inputs), length(inputs))
 # observation_noise(inputs::KalmanInputs) = no_noise() is tempting, but it's
 # a degenerate Kalman model, which causes problems
 observation_noises(inputs::KalmanInputs) = Fill(observation_noise(inputs), length(inputs))
-observation_mat(inputs::KalmanInputs) = IdentityMat()
+observation_mat(inputs::KalmanInputs) = Identity()
 observation_mats(inputs::KalmanInputs) = Fill(observation_mat(inputs), length(inputs))
 
 ## Delegations
@@ -86,6 +86,14 @@ kalman_smoother(inputs::KalmanInputs, filtered_states::AbstractArray{<:Gaussian}
                     transition_noises=transition_noises(inputs))
 kalman_smoother(inputs::KalmanInputs, initial_state::Gaussian) =
     kalman_smoother(inputs, kalman_filter(inputs, initial_state)[1])
+
+kalman_sample(inputs::KalmanInputs, rng::AbstractRNG, initial_state) =
+    kalman_sample(rng, initial_state;
+                  observation_noises=observation_noises(inputs),
+                  transition_mats=transition_mats(inputs),
+                  transition_noises=transition_noises(inputs),
+                  observation_mats=observation_mats(inputs))
+
 
 ################################################################################
 

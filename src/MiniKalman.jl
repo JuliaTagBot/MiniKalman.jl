@@ -6,6 +6,25 @@ using StaticArrays
 
 export kfilter, kalman_filter, white_noise, kalman_smoother, kalman_sample, no_noise
 
+################################################################################
+# Algebraic identities
+#
+# FillArrays.jl has `Zero` and `Eye`, which are good, but:
+#  - vec + Zero(2) creates a new `vec` instead of returning `vec`, which is wasteful
+#  - They include type info and length, which are kinda annoying to specify.
+#    I just want a clean algebraic object.
+
+struct Identity end
+Base.:*(::Identity, x) = x
+Base.:*(x, ::Identity) = x
+Base.transpose(::Identity) = Identity()
+
+struct Zero end
+Base.:+(x, ::Zero) = x
+Base.:+(::Zero, x) = x
+
+################################################################################
+
 parameters(g::Gaussian) = mean(g), cov(g)
 
 predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussian) =
@@ -56,7 +75,7 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
 end
 
 no_noise(d) = Gaussian(Zeros(d), Zeros(d, d))
-no_noise() = Gaussian(ZeroMat(), ZeroMat())
+no_noise() = Gaussian(Zero(), Zero())
 white_noise(vals...) = Gaussian(Zeros(length(vals)), SDiagonal(vals...))
 
 function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
