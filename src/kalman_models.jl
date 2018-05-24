@@ -1,4 +1,5 @@
 using MacroTools, QuickTypes
+using QuickTypes: fieldsof, construct
 
 include("identities.jl")
 
@@ -54,6 +55,17 @@ macro kalman_model(def)
 end
 
 Base.length(inputs::Inputs) = inputs._N
+""" Create a new model of the same type as `model`, but with the given `params`.
+This is meant to be used with Optim.jl. Inspired from sklearn's `set_params`. """
+function set_params(model::Model, params::AbstractVector)
+    i = [0]
+    next() = params[i[1]+=1]
+    return construct(typeof(model),
+                     [v isa AbstractVector ? map(_->next(), v) : next()
+                      for v in fieldsof(model)]...)
+end
+get_params(model::Model) = Float64[x for v in fieldsof(model) for x in v]
+
 
 ################################################################################
 ## Defaults
