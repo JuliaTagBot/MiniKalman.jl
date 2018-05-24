@@ -127,6 +127,7 @@ end
 # Sampling
 
 # Technically type piracy, but necessary. FIXME somehow?
+# This is essentially the definition of sampling from a dirac delta. 
 Base.rand(RNG, P::Gaussian{Zeros{T, 1, Tuple{Int64}}}) where T =
     P.μ + chol(P.Σ)'*randn(RNG, T, length(P.μ))
 
@@ -157,5 +158,7 @@ function kalman_sample(rng::AbstractRNG, initial_state,
     return (map(first, result), map(last, result))
 end
 
+
+include("kalman_models.jl")
 
 end  # module
