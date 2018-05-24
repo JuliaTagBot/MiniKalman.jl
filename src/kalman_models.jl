@@ -80,15 +80,12 @@ kalman_filter(inputs::KalmanInputs, initial_state) =
                   transition_noises=transition_noises(inputs),
                   observation_mats=observation_mats(inputs))
 
-function kalman_smoother(model::KalmanModel, filtered_states::AbstractArray{<:Gaussian};
-                         kwargs...)
-    inputs = input_type(typeof(model))(model; kwargs...)
+kalman_smoother(inputs::KalmanInputs, filtered_states::AbstractArray{<:Gaussian}) = 
     kalman_smoother(filtered_states;
                     transition_mats=transition_mats(inputs),
                     transition_noises=transition_noises(inputs))
-end
-kalman_smoother(model::KalmanModel, initial_state::Gaussian; kwargs...) =
-    kalman_smoother(model, kalman_filter(model, initial_state; kwargs...); kwargs...)
+kalman_smoother(inputs::KalmanInputs, initial_state::Gaussian) =
+    kalman_smoother(inputs, kalman_filter(inputs, initial_state)[1])
 
 ################################################################################
 

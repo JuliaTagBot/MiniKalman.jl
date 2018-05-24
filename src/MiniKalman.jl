@@ -88,7 +88,7 @@ end
 """ Compute the smoothed belief state at step `t`, given the `t+1`'th smoothed belief
 state. """
 function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
-                   next_transition_mat::AbstractMatrix, next_transition_noise::Gaussian)
+                   next_transition_mat, next_transition_noise::Gaussian)
     # Notation:
     #    ₜ₁ means t+1
     #    Xₜₜ means (Xₜ|data up to t)
