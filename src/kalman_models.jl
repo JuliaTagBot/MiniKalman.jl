@@ -9,6 +9,9 @@ export @kalman_model, sample_and_recover, optimize
 abstract type Model end
 abstract type Inputs end
 
+marginal_std(g::Gaussian) = sqrt.(diag(cov(g)))
+marginal_std(g::Gaussian, i::Int) = sqrt(diag(cov(g))[i])
+
 # struct Unspecified end
 
 
@@ -127,6 +130,38 @@ function Optim.optimize(model0::Model, inputs::Inputs,
     return (best_model, o)
 end
 
+
+function plot_hidden_state(estimates, i; true_state=nothing, kwargs...)
+    P = Main.Plots
+    p = P.plot(; ylabel="hidden_state[$i]", xlabel="time", kwargs...)
+    P.plot!(p, getindex.(mean.(estimates), i), labels="estimate", 
+            ribbon=marginal_std.(estimates, i), msa=0.5)
+    if true_state !== nothing
+        P.plot!(p, getindex.(true_state, i); label="truth",
+                linestyle=:dash, color=:orange)
+    end
+    p
+end
+function plot_hidden_state(estimates; true_state=nothing, kwargs...)
+    P = Main.Plots
+    P.plot([plot_hidden_state(estimates, i; true_state=true_state, kwargs...)
+            for i in 1:GaussianDistributions.dim(estimates[1])]...)
+end
+
+
+@qstruct RecoveryResults(best_model, true_model, true_state, estimated_state, optim)
+function Base.show(io::IO, ::MIME"text/html", rr::RecoveryResults)
+    print(io, "Ratio of estimated/true parameters (1.0 is best): <br>")
+    for f in fieldnames(typeof(rr.best_model))
+        print(io, "<pre>  ",
+              f, " => ", round(getfield(rr.best_model, f) ./ getfield(rr.true_model, f),
+                               4), "<br>",
+              "</pre><br>")
+        show(io, MIME"text/html"(),
+             plot_hidden_state(rr.estimated_state; true_state=rr.true_state))
+    end
+end
+
 """ See if we can recover the model parameters _and_ the true parameters using
 data generated from the model.
 
@@ -134,17 +169,14 @@ Concretely, we sample observations and hidden state from `true_model` for the
 given `inputs`, then call `optimize` on `true_model * fuzz_factor`."""
 function sample_and_recover(true_model::Model, inputs::Inputs,
                             rng, initial_state::Gaussian;
-                            fuzz_factor=exp.(randn(rng,
-                                                   GaussianDistributions.dim(initial_state))))
+                            fuzz_factor=
+                              exp.(randn(rng, GaussianDistributions.dim(initial_state))))
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
     true_state, obs = kalman_sample(true_model, inputs, rng, rand(rng, initial_state))
     start_model = set_params(true_model, get_params(true_model) .* fuzz_factor)
     (best_model, o) = optimize(start_model, inputs, obs, initial_state)
     estimated_state = kalman_smoother(best_model, inputs, obs, initial_state)
-    return (get_params(best_model) ./ get_params(true_model),
-            (get_params(best_model), get_params(true_model)),
-            (true_state, estimated_state),
-            o)
+    return RecoveryResults(best_model, true_model, true_state, estimated_state, o)
 end
 
 ################################################################################
