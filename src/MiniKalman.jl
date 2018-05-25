@@ -35,10 +35,14 @@ predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussia
      transition_mat * cov(state_prior) * transition_mat' + cov(transition_noise))
 
 function Base.lufact(m::SMatrix)
-    # Necessary until StaticArrays#73
+    # Necessary for kalman_smoother until StaticArrays#73 (... I guess?)
     return lufact(convert(Matrix, m))
     #return Base.LinAlg.LU(convert(typeof(m), lu.factors), lu.ipiv, lu.info)
 end
+
+# Type piracy! This definition improves filtering speed by 3X!
+Base.:\(A::StaticArrays.SArray{Tuple{1,1},Float64,2,1},
+        B::StaticArrays.SArray) = B ./ A[1]
 
 """ Perform one step of Kalman filtering, for online use. We assume equations:
 
@@ -57,6 +61,7 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
     # with the exception that I'm setting the forcing term to 0, but allowing noise terms
     # with means (without loss of generality)
     # TODO: use keyword arguments on 0.7
+
     Du, R = parameters(observation_noise)     # Du := Dₜuₜ
     A = transition_mat
     C = observation_mat
