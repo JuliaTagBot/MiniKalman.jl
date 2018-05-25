@@ -77,7 +77,7 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
 end
 
 no_noise() = Gaussian(Zero(), Zero())
-white_noise(vals...) = Gaussian(Zeros(length(vals)), SDiagonal(vals...))
+white_noise(vals...) = Gaussian(SVector(zeros(length(vals))...), SDiagonal(vals...))
 
 function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
                        observation_noises::AbstractVector{<:Gaussian};
@@ -145,16 +145,8 @@ end
 ################################################################################
 # Sampling
 
-# Technically type piracy, but necessary.
 # This is essentially the definition of sampling from a dirac delta. 
-Base.rand(RNG, P::Gaussian{U, Zeros{T, 2, Tuple{Int64, Int64}}}) where {U, T} = P.μ 
 Base.rand(RNG, P::Gaussian{U, Zero}) where U = P.μ
-
-# Because the GaussianDistributions definitions of rand don't play well with μ = Zeros.
-# FIXME somehow?
-Base.rand(RNG, P::Gaussian{Zeros{T, 1, Tuple{Int64}}}) where T =
-   chol(P.Σ)'*randn(RNG, T, length(P.μ))
-
 
 """ Returns `(hidden_state::Vector, observations::Vector)` """
 function kalman_sample(rng::AbstractRNG, initial_state,
@@ -171,10 +163,7 @@ function kalman_sample(rng::AbstractRNG, initial_state,
             "All passed vectors should be of the same length")
     result = accumulate((initial_state, nothing), 1:_N) do v, t
         state, _ = v
-        next_state = transition_mats[t] * state +
-            # Need special-case, otherwise PosDefException. Perhaps we should
-            # overload `chol(::Zeros)`
-            (transition_noises[t] == no_noise() ? 0.0 : rand(rng, transition_noises[t]))
+        next_state = transition_mats[t] * state + rand(rng, transition_noises[t])
         return (next_state,
                 observation_mats[t] * next_state + rand(rng, observation_noises[t]))
     end
