@@ -4,12 +4,12 @@ using Optim
 
 include("identities.jl")
 
-export @kalman_model, Positive
+export @kalman_model, sample_and_recover, optimize
 
 abstract type Model end
 abstract type Inputs end
 
-struct Unspecified end
+# struct Unspecified end
 
 
 kalman_quantities = [:observation_mat, :observation_mats, #:initial_state,
@@ -43,7 +43,7 @@ macro kalman_model(def)
         end
     end
 
-    unspecified_kw(k) = Expr(:kw, k, :($MiniKalman.Unspecified()))
+    unspecified_kw(k) = Expr(:kw, k, :(error($"Must specifify $k")))
 
     esc(quote
         $MiniKalman.@qstruct $model_type(; $(map(unspecified_kw, param_vars)...)) <: $MiniKalman.Model
@@ -100,7 +100,7 @@ kalman_smoother(m::Model, inputs::Inputs, filtered_states::AbstractVector{<:Gaus
                     transition_noises=transition_noises(m, inputs))
 kalman_smoother(m::Model, inputs::Inputs, observations::AbstractVector,
                 initial_state::Gaussian) =
-    kalman_smoother(inputs, kalman_filter(m, inputs, observations, initial_state)[1])
+    kalman_smoother(m, inputs, kalman_filter(m, inputs, observations, initial_state)[1])
 
 kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG, initial_state) =
     kalman_sample(rng, initial_state, observation_noises(m, inputs);
@@ -125,6 +125,26 @@ function Optim.optimize(model0::Model, inputs::Inputs,
     o = optimize(td, initial_x, mins, maxes, Fminbox{LBFGS}())
     best_model = set_params(model0, Optim.minimizer(o))
     return (best_model, o)
+end
+
+""" See if we can recover the model parameters _and_ the true parameters using
+data generated from the model.
+
+Concretely, we sample observations and hidden state from `true_model` for the
+given `inputs`, then call `optimize` on `true_model * fuzz_factor`."""
+function sample_and_recover(true_model::Model, inputs::Inputs,
+                            rng, initial_state::Gaussian;
+                            fuzz_factor=exp.(randn(rng,
+                                                   GaussianDistributions.dim(initial_state))))
+    rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
+    true_state, obs = kalman_sample(true_model, inputs, rng, rand(rng, initial_state))
+    start_model = set_params(true_model, get_params(true_model) .* fuzz_factor)
+    (best_model, o) = optimize(start_model, inputs, obs, initial_state)
+    estimated_state = kalman_smoother(best_model, inputs, obs, initial_state)
+    return (get_params(best_model) ./ get_params(true_model),
+            (get_params(best_model), get_params(true_model)),
+            (true_state, estimated_state),
+            o)
 end
 
 ################################################################################
