@@ -156,11 +156,11 @@ function Base.show(io::IO, ::MIME"text/html", rr::RecoveryResults)
     for f in fieldnames(typeof(rr.estimated_model))
         print(io, "<pre>  ",
               f, " => ", round(getfield(rr.estimated_model, f) ./ getfield(rr.true_model, f),
-                               4), "<br>",
-              "</pre><br>")
-        show(io, MIME"text/html"(),
-             plot_hidden_state(rr.estimated_state; true_state=rr.true_state))
+                               4), 
+              "</pre>")
     end
+    show(io, MIME"text/html"(),
+         plot_hidden_state(rr.estimated_state; true_state=rr.true_state))
 end
 
 """ See if we can recover the model parameters _and_ the true parameters using
@@ -170,11 +170,13 @@ Concretely, we sample observations and hidden state from `true_model` for the
 given `inputs`, then call `optimize` on `true_model * fuzz_factor`."""
 function sample_and_recover(true_model::Model, inputs::Inputs,
                             rng, initial_state::Gaussian;
-                            fuzz_factor=
-                              exp.(randn(rng, GaussianDistributions.dim(initial_state))))
+                            fuzz_factor=exp.(randn(rng, length(get_params(true_model)))),
+                            start_model=nothing)
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
     true_state, obs = kalman_sample(true_model, inputs, rng, rand(rng, initial_state))
-    start_model = set_params(true_model, get_params(true_model) .* fuzz_factor)
+    if start_model === nothing
+        start_model = set_params(true_model, get_params(true_model) .* fuzz_factor)
+    end
     (best_model, o) = optimize(start_model, inputs, obs, initial_state)
     estimated_state = kalman_smoother(best_model, inputs, obs, initial_state)
     return RecoveryResults(true_model, best_model, true_state, estimated_state, obs, o)
