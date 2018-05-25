@@ -149,12 +149,13 @@ function plot_hidden_state(estimates; true_state=nothing, kwargs...)
 end
 
 
-@qstruct RecoveryResults(best_model, true_model, true_state, estimated_state, optim)
+@qstruct RecoveryResults(true_model, estimated_model, true_state, estimated_state, obs,
+                         optim)
 function Base.show(io::IO, ::MIME"text/html", rr::RecoveryResults)
     print(io, "Ratio of estimated/true parameters (1.0 is best): <br>")
-    for f in fieldnames(typeof(rr.best_model))
+    for f in fieldnames(typeof(rr.estimated_model))
         print(io, "<pre>  ",
-              f, " => ", round(getfield(rr.best_model, f) ./ getfield(rr.true_model, f),
+              f, " => ", round(getfield(rr.estimated_model, f) ./ getfield(rr.true_model, f),
                                4), "<br>",
               "</pre><br>")
         show(io, MIME"text/html"(),
@@ -176,7 +177,7 @@ function sample_and_recover(true_model::Model, inputs::Inputs,
     start_model = set_params(true_model, get_params(true_model) .* fuzz_factor)
     (best_model, o) = optimize(start_model, inputs, obs, initial_state)
     estimated_state = kalman_smoother(best_model, inputs, obs, initial_state)
-    return RecoveryResults(best_model, true_model, true_state, estimated_state, o)
+    return RecoveryResults(true_model, best_model, true_state, estimated_state, obs, o)
 end
 
 ################################################################################
