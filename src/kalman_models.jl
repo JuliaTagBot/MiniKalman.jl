@@ -7,12 +7,25 @@ include("identities.jl")
 export @kalman_model, sample_and_recover, optimize
 
 abstract type Model end
-abstract type Inputs end
+
+################################################################################
+# Inputs
+
+# We have to store N, because some Kalman filters simply have no inputs.
+""" A simple structure to store the length of the time series (`N`) + whatever
+inputs the model calls for. """
+@qstruct Inputs(N::Int, quantities::Dict{Symbol, Any})
+Inputs(N::Int; kwargs...) = Inputs(N, Dict(kwargs))
+
+get_input(inputs::Inputs, var::Symbol) =
+    (haskey(inputs.quantities, var) ? inputs.quantities[var] :
+     error("Missing input $var"))
+Base.length(inputs::Inputs) = inputs.N
+
+################################################################################
 
 marginal_std(g::Gaussian) = sqrt.(diag(cov(g)))
 marginal_std(g::Gaussian, i::Int) = sqrt(diag(cov(g))[i])
-
-# struct Unspecified end
 
 
 kalman_quantities = [:observation_mat, :observation_mats, #:initial_state,
@@ -22,7 +35,6 @@ kalman_quantities = [:observation_mat, :observation_mats, #:initial_state,
 for q in kalman_quantities
     @eval function $q end
 end
-function input_type end
 
 
 """ See notebook 06 for examples. """
@@ -38,9 +50,10 @@ macro kalman_model(def)
         @assert(fname in kalman_quantities,
                 "`$fname` is not a valid Kalman model quantity ($kalman_quantities)")
         quote
-            function $MiniKalman.$fname($km::$model_type, $ki::$inputs_type)
+            function $MiniKalman.$fname($km::$model_type, $ki::$MiniKalman.Inputs)
                 $([:($p = $km.$p) for p in param_vars]...)
-                $([:($i = $ki.$i) for i in input_vars]...)
+                $([:($i = $MiniKalman.get_input($ki, $(Expr(:quote, i))))
+                   for i in input_vars]...)
                 $expr
             end
         end
@@ -50,15 +63,11 @@ macro kalman_model(def)
 
     esc(quote
         $MiniKalman.@qstruct $model_type(; $(map(unspecified_kw, param_vars)...)) <: $MiniKalman.Model
-        $MiniKalman.@qstruct $inputs_type(_N::Int;
-                                          $(map(unspecified_kw, input_vars)...)) <: $MiniKalman.Inputs
         $(fundefs...)
-        $MiniKalman.input_type(::Type{<:$model_type}) = $inputs_type
         $model_type
     end)
 end
 
-Base.length(inputs::Inputs) = inputs._N
 """ Create a new model of the same type as `model`, but with the given `params`.
 This is meant to be used with Optim.jl. Inspired from sklearn's `set_params`. """
 function set_params(model::Model, params::AbstractVector)
@@ -86,9 +95,6 @@ observation_mats(m, inputs::Inputs) = Fill(observation_mat(m, inputs), length(in
 
 ################################################################################
 ## Delegations
-
-# Rename to `Inputs(model; kwargs...)`?
-Inputs(model::Model, N::Int; kwargs...) = input_type(typeof(model))(N; kwargs...)
 
 kalman_filter(m::Model, inputs::Inputs, observations::AbstractVector, initial_state) = 
     kalman_filter(initial_state, observations,
@@ -151,12 +157,15 @@ end
 
 @qstruct RecoveryResults(true_model, estimated_model, true_state, estimated_state, obs,
                          optim)
+parameter_accuracy_ratios(rr::RecoveryResults) =
+    [f=>getfield(rr.estimated_model, f) ./ getfield(rr.true_model, f)
+     for f in fieldnames(typeof(rr.estimated_model))]
+
 function Base.show(io::IO, ::MIME"text/html", rr::RecoveryResults)
     print(io, "Ratio of estimated/true parameters (1.0 is best): <br>")
-    for f in fieldnames(typeof(rr.estimated_model))
+    for (f, ratio) in parameter_accuracy_ratios(rr)
         print(io, "<pre>  ",
-              f, " => ", round(getfield(rr.estimated_model, f) ./ getfield(rr.true_model, f),
-                               4), 
+              f, " => ", round.(ratio, 4), 
               "</pre>")
     end
     show(io, MIME"text/html"(),
