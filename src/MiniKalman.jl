@@ -77,7 +77,8 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
 end
 
 no_noise() = Gaussian(Zero(), Zero())
-white_noise(vals...) = Gaussian(SVector(zeros(length(vals))...), SDiagonal(vals...))
+white_noise(vals...) = Gaussian(SVector(zeros(length(vals))...), # TODO: try Zero
+                                SDiagonal(vals...))
 
 function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
                        observation_noises::AbstractVector{<:Gaussian};
