@@ -41,7 +41,9 @@ function Base.lufact(m::SMatrix)
 end
 
 # Type piracy! This definition improves filtering speed by 3X!
-Base.:\(A::StaticArrays.SArray{Tuple{1,1},Float64,2,1},
+# I believe that it could also easily support a diagonal A, but that's not useful for us.
+# See definitions in Base.
+Base.:\(A::StaticArrays.SArray{Tuple{1,1},<:Any,2,1},
         B::StaticArrays.SArray) = B ./ A[1]
 
 """ Perform one step of Kalman filtering, for online use. We assume equations:
