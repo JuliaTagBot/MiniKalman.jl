@@ -126,7 +126,7 @@ kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG, initial_state) =
 """ Finds a set of model parameters that attempts to maximize the log-likelihood
 on the given dataset. Returns `(best_model, optim_object)`. """
 function Optim.optimize(model0::Model, inputs::Inputs,
-                        observations::AbstractVector, initial_state)
+                        observations::AbstractVector, initial_state; kwargs...)
     initial_x = get_params(model0)
     function objective(params)
         model = set_params(model0, params)
@@ -135,7 +135,7 @@ function Optim.optimize(model0::Model, inputs::Inputs,
     td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
     mins = fill(0.0, length(initial_x))
     maxes = fill(Inf, length(initial_x))
-    o = optimize(td, initial_x, mins, maxes, Fminbox{LBFGS}())
+    o = optimize(td, initial_x, mins, maxes, Fminbox{LBFGS}(); kwargs...)
     best_model = set_params(model0, Optim.minimizer(o))
     return (best_model, o)
 end
