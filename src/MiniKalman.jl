@@ -99,6 +99,8 @@ kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
                   observation_mats)
 
 # I split off the non-kwarg version mostly for `@code_warntype` ease. Revisit in 0.7?
+# It turned out to have a negligible impact on performance anyway. The bottle-neck
+# was elsewhere.
 function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
                        observation_noises::AbstractVector{<:Gaussian},
                        transition_mats::AbstractVector,
