@@ -27,7 +27,10 @@ Base.:+(::Zero, x) = x
 
 ################################################################################
 
-parameters(g::Gaussian) = (mean(g), cov(g))
+no_noise() = Gaussian(Zero(), Zero())
+white_noise(vals...) = Gaussian(SVector(ntuple(_->0.0, length(vals))), SDiagonal(vals))
+
+parameters(g::Gaussian) = (mean(g), cov(g))   # convenience
 
 predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussian) =
     # Helper. Returning a tuple is more convenient than a Gaussian
@@ -40,7 +43,7 @@ function Base.lufact(m::SMatrix)
     #return Base.LinAlg.LU(convert(typeof(m), lu.factors), lu.ipiv, lu.info)
 end
 
-# Type piracy! This definition improves filtering speed by 3X!
+# Type piracy! This (mathematically correct) definition improves filtering speed by 3X!
 # I believe that it could also easily support a diagonal A, but that's not useful for us.
 # See definitions in Base.
 Base.:\(A::StaticArrays.SArray{Tuple{1,1},<:Any,2,1},
@@ -83,16 +86,12 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
     return (filtered_state, ll)
 end
 
-no_noise() = Gaussian(Zero(), Zero())
-white_noise(vals...) = Gaussian(SVector(ntuple(_->0.0, length(vals))), SDiagonal(vals))
-
 kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
               observation_noises::AbstractVector{<:Gaussian};
               _N=length(observations), # "hidden" kwargs to help create defaults
               transition_mats::AbstractVector=Fill(Identity(), _N),
               transition_noises::AbstractVector{<:Gaussian}=
               Fill(no_noise(), _N),
-              # This default only makes sense if `d₂==d`
               observation_mats::AbstractVector=Fill(Identity(), _N)) =
     kalman_filter(initial_state_prior, observations,
                   observation_noises, transition_mats, transition_noises,
@@ -100,7 +99,7 @@ kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
 
 # I split off the non-kwarg version mostly for `@code_warntype` ease. Revisit in 0.7?
 # It turned out to have a negligible impact on performance anyway. The bottle-neck
-# was elsewhere.
+# was elsewhere. TODO: merge them together again?
 function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
                        observation_noises::AbstractVector{<:Gaussian},
                        transition_mats::AbstractVector,
@@ -179,7 +178,6 @@ function kalman_sample(rng::AbstractRNG, initial_state,
                        transition_mats::AbstractVector=Fill(Identity(), _N),
                        transition_noises::AbstractVector{<:Gaussian}=
                            Fill(no_noise(), _N),
-                       # This default only makes sense if `d₂==d`
                        observation_mats::AbstractVector=Fill(Identity(), _N))
     @assert(length(transition_mats) ==
             length(transition_noises) == length(observation_mats) ==

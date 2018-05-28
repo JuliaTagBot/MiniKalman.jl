@@ -107,7 +107,7 @@ kalman_filter(m::Model, inputs::Inputs, observations::AbstractVector, initial_st
                   transition_noises(m, inputs),
                   observation_mats(m, inputs))
 
-kalman_smoother(m::Model, inputs::Inputs, filtered_states::AbstractVector{<:Gaussian})=
+kalman_smoother(m::Model, inputs::Inputs, filtered_states::AbstractVector{<:Gaussian}) =
     kalman_smoother(filtered_states;
                     transition_mats=transition_mats(m, inputs),
                     transition_noises=transition_noises(m, inputs))
