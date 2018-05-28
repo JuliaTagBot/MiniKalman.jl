@@ -84,31 +84,45 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
 end
 
 no_noise() = Gaussian(Zero(), Zero())
-white_noise(vals...) = Gaussian(SVector(zeros(length(vals))...), # TODO: try Zero
-                                SDiagonal(vals...))
+white_noise(vals...) = Gaussian(SVector(ntuple(_->0.0, length(vals))), SDiagonal(vals))
 
+kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
+              observation_noises::AbstractVector{<:Gaussian};
+              _N=length(observations), # "hidden" kwargs to help create defaults
+              transition_mats::AbstractVector=Fill(Identity(), _N),
+              transition_noises::AbstractVector{<:Gaussian}=
+              Fill(no_noise(), _N),
+              # This default only makes sense if `d₂==d`
+              observation_mats::AbstractVector=Fill(Identity(), _N)) =
+    kalman_filter(initial_state_prior, observations,
+                  observation_noises, transition_mats, transition_noises,
+                  observation_mats)
+
+# I split off the non-kwarg version mostly for `@code_warntype` ease. Revisit in 0.7?
 function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
-                       observation_noises::AbstractVector{<:Gaussian};
-                       _N=length(observations), # "hidden" kwargs to help create defaults
-                       transition_mats::AbstractVector=Fill(Identity(), _N),
-                       transition_noises::AbstractVector{<:Gaussian}=
-                           Fill(no_noise(), _N),
-                       # This default only makes sense if `d₂==d`
-                       observation_mats::AbstractVector=Fill(Identity(), _N))
+                       observation_noises::AbstractVector{<:Gaussian},
+                       transition_mats::AbstractVector,
+                       transition_noises::AbstractVector{<:Gaussian},
+                       observation_mats::AbstractVector)
     @assert(length(observations) == length(transition_mats) ==
             length(transition_noises) == length(observation_mats) ==
             length(observation_noises),
             "All passed vectors should be of the same length")
-    # We use `accumulate` instead of a dumb loop to benefit from automatic type widening.
-    # This is necessary for ForwardDiff, but it might cause type-stability issues
-    # (I'm not sure). Alternatively, we could use the `promote_type` of all input
-    # matrices as the eltype of the result.
-    result = accumulate((initial_state_prior, 0.0), 1:length(observations)) do v, t
-        state, _ = v
-        kfilter(state, transition_mats[t], transition_noises[t],
-                observations[t], observation_mats[t], observation_noises[t])
+    # For type stability
+    T = typeof(kfilter(initial_state_prior, transition_mats[1], transition_noises[1],
+                       observations[1], observation_mats[1], observation_noises[1])[1])
+    filtered_states = Vector{T}(length(observations))
+
+    state = convert(T, initial_state_prior)
+    ll_sum = 0.0
+    for t in 1:length(observations)
+        (state, ll) =
+            kfilter(state, transition_mats[t], transition_noises[t],
+                    observations[t], observation_mats[t], observation_noises[t])
+        filtered_states[t] = state
+        ll_sum += ll
     end
-    return (map(first, result), sum(last, result))
+    return filtered_states, ll_sum
 end
 
 """ Compute the smoothed belief state at step `t`, given the `t+1`'th smoothed belief

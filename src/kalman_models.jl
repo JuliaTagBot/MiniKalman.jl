@@ -98,10 +98,10 @@ observation_mats(m, inputs::Inputs) = Fill(observation_mat(m, inputs), length(in
 
 kalman_filter(m::Model, inputs::Inputs, observations::AbstractVector, initial_state) = 
     kalman_filter(initial_state, observations,
-                  observation_noises(m, inputs);
-                  transition_mats=transition_mats(m, inputs),
-                  transition_noises=transition_noises(m, inputs),
-                  observation_mats=observation_mats(m, inputs))
+                  observation_noises(m, inputs),
+                  transition_mats(m, inputs),
+                  transition_noises(m, inputs),
+                  observation_mats(m, inputs))
 
 kalman_smoother(m::Model, inputs::Inputs, filtered_states::AbstractVector{<:Gaussian})=
     kalman_smoother(filtered_states;
