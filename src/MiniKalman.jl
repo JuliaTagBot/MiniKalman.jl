@@ -28,7 +28,8 @@ Base.:+(::Zero, x) = x
 ################################################################################
 
 no_noise() = Gaussian(Zero(), Zero())
-white_noise(vals...) = Gaussian(SVector(ntuple(_->0.0, length(vals))), SDiagonal(vals))
+white_noise(sigma2s...) =
+    Gaussian(SVector(ntuple(_->0.0, length(sigma2s))), SDiagonal(sigma2s))
 
 parameters(g::Gaussian) = (mean(g), cov(g))   # convenience
 
@@ -37,11 +38,11 @@ predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussia
     (transition_mat * mean(state_prior) + mean(transition_noise),
      transition_mat * cov(state_prior) * transition_mat' + cov(transition_noise))
 
-function Base.lufact(m::SMatrix)
-    # Necessary for kalman_smoother until StaticArrays#73 (... I guess?)
-    return lufact(convert(Matrix, m))
-    #return Base.LinAlg.LU(convert(typeof(m), lu.factors), lu.ipiv, lu.info)
-end
+# function Base.lufact(m::SMatrix)
+#     # Necessary for kalman_smoother until StaticArrays#73 (... I guess?)
+#     return lufact(convert(Matrix, m))
+#     #return Base.LinAlg.LU(convert(typeof(m), lu.factors), lu.ipiv, lu.info)
+# end
 
 # Type piracy! This (mathematically correct) definition improves filtering speed by 3X!
 # I believe that it could also easily support a diagonal A, but that's not useful for us.
@@ -145,7 +146,11 @@ function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
         predicted_state(filtered_state, next_transition_mat, next_transition_noise)
 
     # Smoothed state
-    J = Σₜₜ * Aₜ₁' / Σₜ₁ₜ       # backwards Kalman gain matrix
+    # I don't like to use the inverse (the above equation is in theory more accurate),
+    # but until StaticArrays#73... Note that `lu(::StaticArray)` is defined and might
+    # be used, and Σ is positive definite, so there might be faster algorithms.
+    J = Σₜₜ * Aₜ₁' * inv(Σₜ₁ₜ)       # backwards Kalman gain matrix
+    #J = Σₜₜ * Aₜ₁' / Σₜ₁ₜ       # backwards Kalman gain matrix
     return Gaussian(μₜₜ + J * (μₜ₁T - μₜ₁ₜ),
                     Σₜₜ + J * (Σₜ₁T - Σₜ₁ₜ) * J')
 end
