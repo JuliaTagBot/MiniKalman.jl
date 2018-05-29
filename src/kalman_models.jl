@@ -1,6 +1,7 @@
 using MacroTools, QuickTypes
 using QuickTypes: fieldsof, construct
 using Optim
+import GaussianDistributions
 
 include("identities.jl")
 
@@ -11,15 +12,15 @@ abstract type Model end
 ################################################################################
 # Inputs
 
-# We have to store N, because some Kalman filters simply have no inputs.
+# We have to store N, because some Kalman filters simply have no inputs, or the inputs
+# are not 
 """ A simple structure to store the length of the time series (`N`) + whatever
-inputs the model calls for. """
+inputs the model calls for. This does not contain the observations. """
 @qstruct Inputs(N::Int, quantities::Dict{Symbol, Any})
 Inputs(N::Int; kwargs...) = Inputs(N, Dict(kwargs))
-
-get_input(inputs::Inputs, var::Symbol) =
-    (haskey(inputs.quantities, var) ? inputs.quantities[var] :
-     error("Missing input $var"))
+Base.getindex(inputs::Inputs, sym::Symbol) = 
+    (haskey(inputs.quantities, sym) ? inputs.quantities[sym] :
+     error("Missing input $sym"))
 Base.length(inputs::Inputs) = inputs.N
 
 ################################################################################
@@ -55,7 +56,7 @@ macro kalman_model(def)
                 # in an environment where all types are known.
                 $MiniKalman.$fname($km, nothing,
                                    $([:($km.$p) for p in param_vars]...),
-                                   $([:($MiniKalman.get_input($ki, $(Expr(:quote, i))))
+                                   $([:($ki[$(Expr(:quote, i))])
                                       for i in input_vars]...))
             $MiniKalman.$fname($km::$model_type, ::Void,
                                $(param_vars...), $(input_vars...))=
@@ -126,10 +127,11 @@ kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG, initial_state) =
 """ Finds a set of model parameters that attempts to maximize the log-likelihood
 on the given dataset. Returns `(best_model, optim_object)`. """
 function Optim.optimize(model0::Model, inputs::Inputs,
-                        observations::AbstractVector, initial_state; kwargs...)
+                        observations::AbstractVector, initial_state;
+                        post_f=identity, kwargs...)
     initial_x = get_params(model0)
     function objective(params)
-        model = set_params(model0, params)
+        model = post_f(set_params(model0, params))
         -kalman_filter(model, inputs, observations, initial_state)[2]
     end
     td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
@@ -152,10 +154,13 @@ function plot_hidden_state(estimates, i; true_state=nothing, kwargs...)
     end
     p
 end
-function plot_hidden_state(estimates; true_state=nothing, kwargs...)
+function plot_hidden_state(estimates; true_state=nothing,
+                           ylabels=["hidden_state[$i]" for i in 1:dim(estimates[1])],
+                           kwargs...)
     P = Main.Plots
-    P.plot([plot_hidden_state(estimates, i; true_state=true_state, kwargs...)
-            for i in 1:GaussianDistributions.dim(estimates[1])]...)
+    P.plot([plot_hidden_state(estimates, i; true_state=true_state,
+                              ylabel=ylabels[i], kwargs...)
+            for i in 1:dim(estimates[1])]...)
 end
 
 
