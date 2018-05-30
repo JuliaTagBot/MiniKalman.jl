@@ -32,7 +32,8 @@ marginal_std(g::Gaussian, i::Int) = sqrt(diag(cov(g))[i])
 kalman_quantities = [:observation_mat, :observation_mats, #:initial_state,
                      :observation_noise, :observation_noises, 
                      :transition_mat, :transition_mats,
-                     :transition_noise, :transition_noises]
+                     :transition_noise, :transition_noises,
+                     :labels]
 for q in kalman_quantities
     @eval function $q end
 end
