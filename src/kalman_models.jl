@@ -146,7 +146,7 @@ end
 
 function plot_hidden_state(time, estimates, i; true_state=nothing, kwargs...)
     P = Main.Plots
-    p = P.plot(; ylabel="hidden_state[$i]", xlabel="time", kwargs...)
+    p = P.plot(; xlabel="time", kwargs...)
     P.plot!(p, time, getindex.(mean.(estimates), i), labels="estimate", 
             ribbon=marginal_std.(estimates, i), msa=0.5)
     if true_state !== nothing
