@@ -56,17 +56,23 @@ macro kalman_model(def)
         @assert(@capture(c, fname_ := expr_), "Bad quantity definition: $c")
         @assert(fname in kalman_quantities,
                 "`$fname` is not a valid Kalman model quantity ($kalman_quantities)")
-        quote
-            $MiniKalman.$fname($km::$model_type, $ki::$MiniKalman.Inputs) =
-                # We break $fname in two definitions, because `expr` should be evaluated
-                # in an environment where all types are known.
-                $MiniKalman.$fname($km, nothing,
-                                   $([:($km.$p) for p in param_vars]...),
-                                   $([:($ki[$(Expr(:quote, i))])
-                                      for i in input_vars]...))
-            $MiniKalman.$fname($km::$model_type, ::Void,
-                               $(param_vars...), $(input_vars...))=
+        if fname == :labels
+            quote
+                $MiniKalman.labels($km::$model_type) = $expr
+            end
+        else
+            quote
+                $MiniKalman.$fname($km::$model_type, $ki::$MiniKalman.Inputs) =
+                    # We break $fname in two definitions, because `expr` should
+                    # be evaluated in an environment where all types are known.
+                    $MiniKalman.$fname($km, nothing,
+                                       $([:($km.$p) for p in param_vars]...),
+                                       $([:($ki[$(Expr(:quote, i))])
+                                          for i in input_vars]...))
+                $MiniKalman.$fname($km::$model_type, ::Void,
+                                   $(param_vars...), $(input_vars...))=
                 $expr  # the computation is done here
+            end
         end
     end
 
