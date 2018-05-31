@@ -68,9 +68,13 @@ macro kalman_model(def)
         end
     end
 
+    proc_param(s::Symbol) = s
+    proc_param(e::Expr) =
+        # Replace :kw with :=, because that's what @with_kw expects
+        (e.head==:kw) ? Expr(:(=), e.args...) : e
     esc(quote
         $MiniKalman.@with_kw struct $model_type <: $(MiniKalman.Model) # Parameters.jl#56
-            $(param_vars...)
+            $(map(proc_param, params)...)
         end
         $(fundefs...)
         $model_type
