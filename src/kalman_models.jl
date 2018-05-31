@@ -12,19 +12,21 @@ abstract type Model end
 ################################################################################
 # Inputs
 
+abstract type Inputs end
+
 # We have to store N, because some Kalman filters simply have no inputs, or the inputs
 # are not 
 """ A simple structure to store the length of the time series (`N`) + whatever
 inputs the model calls for. This does not contain the observations. """
-struct Inputs
+struct DictInputs <: Inputs
     N::Int
     quantities::Dict{Symbol, Any}
 end
-Inputs(N::Int; kwargs...) = Inputs(N, Dict(kwargs))
-Base.getindex(inputs::Inputs, sym::Symbol) = 
+Inputs(N::Int; kwargs...) = DictInputs(N, Dict(kwargs))
+Base.getindex(inputs::DictInputs, sym::Symbol) = 
     (haskey(inputs.quantities, sym) ? inputs.quantities[sym] :
      error("Missing input $sym"))
-Base.length(inputs::Inputs) = inputs.N
+Base.length(inputs::DictInputs) = inputs.N
 
 ################################################################################
 
@@ -38,7 +40,7 @@ kalman_quantities = [:observation_mat, :observation_mats, #:initial_state,
                      :transition_noise, :transition_noises,
                      :labels]
 for q in kalman_quantities
-    @eval function $q end
+    @eval function $q end  # forward declarations
 end
 
 
