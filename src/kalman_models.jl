@@ -196,7 +196,8 @@ function Base.show(io::IO, ::MIME"text/html", rr::RecoveryResults)
               "</pre>")
     end
     show(io, MIME"text/html"(),
-         plot_hidden_state(rr.estimated_state; true_state=rr.true_state))
+         plot_hidden_state(1:length(rr.obs), rr.estimated_state;
+                           true_state=rr.true_state))
 end
 
 """ See if we can recover the model parameters _and_ the true parameters using
