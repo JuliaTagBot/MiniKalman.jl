@@ -1,5 +1,5 @@
-using MacroTools, QuickTypes
-using QuickTypes: fieldsof, construct
+using MacroTools
+using Parameters
 using Optim
 import GaussianDistributions
 
@@ -16,7 +16,10 @@ abstract type Model end
 # are not 
 """ A simple structure to store the length of the time series (`N`) + whatever
 inputs the model calls for. This does not contain the observations. """
-@qstruct Inputs(N::Int, quantities::Dict{Symbol, Any})
+struct Inputs
+    N::Int
+    quantities::Dict{Symbol, Any}
+end
 Inputs(N::Int; kwargs...) = Inputs(N, Dict(kwargs))
 Base.getindex(inputs::Inputs, sym::Symbol) = 
     (haskey(inputs.quantities, sym) ? inputs.quantities[sym] :
@@ -65,25 +68,31 @@ macro kalman_model(def)
         end
     end
 
-    unspecified_kw(k) = Expr(:kw, k, :(error($"Must specifify $k")))
-
     esc(quote
-        $MiniKalman.@qstruct $model_type(; $(map(unspecified_kw, param_vars)...)) <: $MiniKalman.Model
+        $MiniKalman.@with_kw struct $model_type <: $(MiniKalman.Model) # Parameters.jl#56
+            $(param_vars...)
+        end
         $(fundefs...)
         $model_type
     end)
 end
+export reconstruct   # Parameters.jl#57
 
 """ Create a new model of the same type as `model`, but with the given `params`.
 This is meant to be used with Optim.jl. Inspired from sklearn's `set_params`. """
-function set_params(model::Model, params::AbstractVector)
-    i = [0]
-    next() = params[i[1]+=1]
-    return construct(typeof(model),
-                     [v isa AbstractVector ? map(_->next(), v) : next()
-                      for v in fieldsof(model)]...)
+function set_params(model::Model, params::AbstractVector, names=fieldnames(model))
+    i = 1
+    upd = Dict()
+    for name in names
+        v = getfield(model, name)
+        nvals = length(v)
+        upd[name] = params[v isa Number ? i : (i:i+nvals-1)]
+        i += nvals
+    end    
+    return typeof(model)(model; upd...)
 end
-get_params(model::Model) = Float64[x for v in fieldsof(model) for x in v]
+get_params(model::Model, names=fieldnames(model)) =
+    Float64[x for v in names for x in getfield(model, v)]
 
 
 ################################################################################
@@ -129,17 +138,19 @@ kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG, initial_state) =
 on the given dataset. Returns `(best_model, optim_object)`. """
 function Optim.optimize(model0::Model, inputs::Inputs,
                         observations::AbstractVector, initial_state;
-                        post_f=identity, kwargs...)
-    initial_x = get_params(model0)
+                        parameters_to_optimize=fieldnames(model0), post_f=identity,
+                        kwargs...)
+    vars = parameters_to_optimize
+    initial_x = get_params(model0, vars)
     function objective(params)
-        model = post_f(set_params(model0, params))
+        model = post_f(set_params(model0, params, vars))
         -kalman_filter(model, inputs, observations, initial_state)[2]
     end
     td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
     mins = fill(0.0, length(initial_x))
     maxes = fill(Inf, length(initial_x))
     o = optimize(td, initial_x, mins, maxes, Fminbox{LBFGS}(); kwargs...)
-    best_model = set_params(model0, Optim.minimizer(o))
+    best_model = set_params(model0, Optim.minimizer(o), vars)
     return (best_model, o)
 end
 
@@ -165,8 +176,14 @@ function plot_hidden_state(time, estimates; true_state=nothing,
 end
 
 
-@qstruct RecoveryResults(true_model, estimated_model, true_state, estimated_state, obs,
-                         optim)
+struct RecoveryResults
+    true_model
+    estimated_model
+    true_state
+    estimated_state
+    obs
+    optim
+end
 parameter_accuracy_ratios(rr::RecoveryResults) =
     [f=>getfield(rr.estimated_model, f) ./ getfield(rr.true_model, f)
      for f in fieldnames(typeof(rr.estimated_model))]
