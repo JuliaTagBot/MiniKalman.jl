@@ -167,10 +167,11 @@ function Optim.optimize(model0::Model, inputs::Inputs,
 end
 
 
-function plot_hidden_state(time, estimates, i; true_state=nothing, kwargs...)
+function plot_hidden_state(time, estimates, i; true_state=nothing,
+                           label="estimate", kwargs...)
     P = Main.Plots
     p = P.plot(; xlabel="time", kwargs...)
-    P.plot!(p, time, getindex.(mean.(estimates), i), labels="estimate", 
+    P.plot!(p, time, getindex.(mean.(estimates), i), label=label, 
             ribbon=marginal_std.(estimates, i), msa=0.5)
     if true_state !== nothing
         P.plot!(p, time, getindex.(true_state, i); label="truth",
