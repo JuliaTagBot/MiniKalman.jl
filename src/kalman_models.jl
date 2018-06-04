@@ -165,7 +165,7 @@ function Optim.optimize(model0::Model, inputs::Inputs,
     td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
     mins = min isa AbstractVector ? min : fill(min, length(initial_x))
     maxes = fill(Inf, length(initial_x))
-    o = optimize(td, initial_x, mins, maxes, Fminbox{LBFGS}())
+    o = optimize(td, mins, maxes, initial_x, Fminbox(LBFGS()))
     best_model = set_params(model0, Optim.minimizer(o), vars)
     return (best_model, o)
 end
