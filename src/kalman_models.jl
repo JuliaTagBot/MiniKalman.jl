@@ -153,6 +153,7 @@ function Optim.optimize(model0::Model, inputs::Inputs,
                         observations::AbstractVector, initial_state;
                         min=0.0, # 0.0 is a bit arbitrary...
                         parameters_to_optimize=fieldnames(model0), post_f=identity,
+                        method=LBFGS(linesearch=Optim.LineSearches.BackTracking()),
                         kwargs...)
     vars = parameters_to_optimize
     initial_x = get_params(model0, vars)
@@ -164,8 +165,7 @@ function Optim.optimize(model0::Model, inputs::Inputs,
     td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
     mins = min isa AbstractVector ? min : fill(min, length(initial_x))
     maxes = fill(Inf, length(initial_x))
-    algo = LBFGS(linesearch=Optim.LineSearches.BackTracking())
-    o = optimize(td, mins, maxes, initial_x, Fminbox(algo), Optim.Options(; kwargs...))
+    o = optimize(td, mins, maxes, initial_x, Fminbox(method), Optim.Options(; kwargs...))
     best_model = set_params(model0, Optim.minimizer(o), vars)
     return (best_model, o)
 end
