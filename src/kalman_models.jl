@@ -146,39 +146,43 @@ kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG, initial_state) =
 
 ################################################################################
 # Optimization
+
 """ Finds a set of model parameters that attempts to maximize the log-likelihood
 on the given dataset. Returns `(best_model, optim_object)`. """
 function Optim.optimize(model0::Model, inputs::Inputs,
                         observations::AbstractVector, initial_state;
+                        min=0.0, # 0.0 is a bit arbitrary...
                         parameters_to_optimize=fieldnames(model0), post_f=identity,
                         kwargs...)
+    @assert isempty(kwargs) # should be passed to Optim.Options
     vars = parameters_to_optimize
     initial_x = get_params(model0, vars)
     function objective(params)
         model = post_f(set_params(model0, params, vars))
-        -kalman_filter(model, inputs, observations, initial_state)[2]
+        _, ll = kalman_filter(model, inputs, observations, initial_state)
+        return -ll
     end
     td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
-    mins = fill(0.0, length(initial_x))
+    mins = min isa AbstractVector ? min : fill(min, length(initial_x))
     maxes = fill(Inf, length(initial_x))
-    o = optimize(td, initial_x, mins, maxes, Fminbox{LBFGS}(); kwargs...)
+    o = optimize(td, initial_x, mins, maxes, Fminbox{LBFGS}())
     best_model = set_params(model0, Optim.minimizer(o), vars)
     return (best_model, o)
 end
 
 
-function plot_hidden_state(time, estimates, i; true_state=nothing,
-                           label="estimate", kwargs...)
-    P = Main.Plots
-    p = P.plot(; xlabel="time", kwargs...)
+function plot_hidden_state!(p, time, estimates, i; true_state=nothing,
+                            label="estimate", kwargs...)
     P.plot!(p, time, getindex.(mean.(estimates), i), label=label, 
-            ribbon=marginal_std.(estimates, i), msa=0.5)
+            ribbon=marginal_std.(estimates, i), msa=0.5, xlabel="time", kwargs...)
     if true_state !== nothing
         P.plot!(p, time, getindex.(true_state, i); label="truth",
                 linestyle=:dash, color=:orange)
     end
     p
 end
+plot_hidden_state(p, args...; kwargs...) =
+    plot_hidden_state!(Main.Plots.plot(), args...; kwargs...)
 function plot_hidden_state(time, estimates; true_state=nothing,
                            ylabels=["hidden_state[$i]" for i in 1:dim(estimates[1])],
                            kwargs...)
