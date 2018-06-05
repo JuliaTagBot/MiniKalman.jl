@@ -174,7 +174,7 @@ end
 function plot_hidden_state!(p, time, estimates, i; true_state=nothing,
                             label="estimate", kwargs...)
     P = Main.Plots
-    P.plot!(p, time, getindex.(mean.(estimates), i), label=label, 
+    P.plot!(p, time, getindex.(mean.(estimates), i); label=label,
             ribbon=marginal_std.(estimates, i), msa=0.5, xlabel="time", kwargs...)
     if true_state !== nothing
         P.plot!(p, time, getindex.(true_state, i); label="truth",
@@ -182,8 +182,8 @@ function plot_hidden_state!(p, time, estimates, i; true_state=nothing,
     end
     p
 end
-plot_hidden_state(p, args...; kwargs...) =
-    plot_hidden_state!(Main.Plots.plot(), args...; kwargs...)
+plot_hidden_state(a, b, c; kwargs...) =
+    plot_hidden_state!(Main.Plots.plot(), a, b, c; kwargs...)
 plot_hidden_state(time, estimates; true_state=nothing,
                   ylabels=["hidden_state[$i]" for i in 1:dim(estimates[1])],
                   kwargs...) =
