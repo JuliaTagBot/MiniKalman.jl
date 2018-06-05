@@ -30,6 +30,7 @@ Base.:+(::Zero, x) = x
 no_noise() = Gaussian(Zero(), Zero())
 white_noise(sigma2s...) =
     Gaussian(SVector(ntuple(_->0.0, length(sigma2s))), SDiagonal(sigma2s))
+white_noise(sigma2) = Gaussian(SVector(0.0), SMatrix{1,1}(sigma2)) # fast special-case
 
 parameters(g::Gaussian) = (mean(g), cov(g))   # convenience
 
