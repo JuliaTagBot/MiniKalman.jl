@@ -158,13 +158,13 @@ on the given dataset. Returns `(best_model, optim_object)`. """
 function Optim.optimize(model0::Model, inputs::Inputs,
                         observations::AbstractVector, initial_state;
                         min=0.0, # 0.0 is a bit arbitrary...
-                        parameters_to_optimize=fieldnames(model0), post_f=identity,
+                        parameters_to_optimize=fieldnames(model0), 
                         method=LBFGS(linesearch=Optim.LineSearches.BackTracking()),
                         kwargs...)
     vars = parameters_to_optimize
     initial_x = get_params(model0, vars)
     function objective(params)
-        model = post_f(set_params(model0, params, vars))
+        model = set_params(model0, params, vars)
         return -log_likelihood(model, inputs, observations, initial_state)
     end
     td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
