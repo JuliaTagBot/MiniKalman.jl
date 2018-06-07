@@ -4,8 +4,8 @@ using GaussianDistributions, FillArrays
 using GaussianDistributions: dim, logpdf
 using StaticArrays
 
-export kfilter, kalman_filter, white_noise, white_noise2, kalman_smoother, kalman_sample,
-    no_noise
+export kfilter, kalman_filter, white_noise, white_noise1, white_noise2,
+    kalman_smoother, kalman_sample, no_noise
 
 ################################################################################
 # Algebraic identities
@@ -35,7 +35,10 @@ white_noise2(sigma2) = Gaussian(SVector(0.0), SMatrix{1,1}(sigma2)) # fast speci
 white_noise(args...) = white_noise2(args...)  # TODO: eventually have
                                               # white_noise(sigma) = white_noise2(sigma^2)
                                               # and maybe stop exporting white_noise2
-                                              # since it's counter-intuitive
+                                              # since it's counter-intuitive,
+                                              # and deprecate white_noise1
+white_noise1(args...) = white_noise2((args.^2)...)
+
 Base.@deprecate white_noise white_noise2
 
 parameters(g::Gaussian) = (mean(g), cov(g))   # convenience
@@ -118,11 +121,14 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
             length(observation_noises),
             "All passed vectors should be of the same length")
     # For type stability
-    dum_state, _, dum_predictive =
+    dum_state, _, _ =
         kfilter(initial_state_prior, transition_mats[1], transition_noises[1],
                 observations[1], observation_mats[1], observation_noises[1])
-    T = typeof(dum_state)
-    P = typeof(dum_predictive)
+    dum_state2, _, dum_predictive2 =
+        kfilter(dum_state, transition_mats[2], transition_noises[2],
+                observations[2], observation_mats[2], observation_noises[2])
+    T = typeof(dum_state2)
+    P = typeof(dum_predictive2)
     filtered_states = Vector{T}(length(observations))
     predicted_obs = Vector{P}(length(observations))
 
