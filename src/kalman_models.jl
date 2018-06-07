@@ -129,6 +129,12 @@ kalman_filter(m::Model, inputs::Inputs, observations::AbstractVector, initial_st
                   transition_mats(m, inputs),
                   transition_noises(m, inputs),
                   observation_mats(m, inputs))
+log_likelihood(m::Model, inputs::Inputs, observations::AbstractVector, initial_state) = 
+    log_likelihood(initial_state, observations,
+                   observation_noises(m, inputs),
+                   transition_mats(m, inputs),
+                   transition_noises(m, inputs),
+                   observation_mats(m, inputs))
 
 kalman_smoother(m::Model, inputs::Inputs, filtered_states::AbstractVector{<:Gaussian}) =
     kalman_smoother(filtered_states;
@@ -159,8 +165,7 @@ function Optim.optimize(model0::Model, inputs::Inputs,
     initial_x = get_params(model0, vars)
     function objective(params)
         model = post_f(set_params(model0, params, vars))
-        _, ll = kalman_filter(model, inputs, observations, initial_state)
-        return -ll
+        return -log_likelihood(model, inputs, observations, initial_state)
     end
     td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
     mins = min isa AbstractVector ? min : fill(min, length(initial_x))
