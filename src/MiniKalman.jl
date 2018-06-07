@@ -4,7 +4,8 @@ using GaussianDistributions, FillArrays
 using GaussianDistributions: dim, logpdf
 using StaticArrays
 
-export kfilter, kalman_filter, white_noise, kalman_smoother, kalman_sample, no_noise
+export kfilter, kalman_filter, white_noise, white_noise2, kalman_smoother, kalman_sample,
+    no_noise
 
 ################################################################################
 # Algebraic identities
@@ -28,9 +29,14 @@ Base.:+(::Zero, x) = x
 ################################################################################
 
 no_noise() = Gaussian(Zero(), Zero())
-white_noise(sigma2s...) =
+white_noise2(sigma2s...) =
     Gaussian(SVector(ntuple(_->0.0, length(sigma2s))), SDiagonal(sigma2s))
-white_noise(sigma2) = Gaussian(SVector(0.0), SMatrix{1,1}(sigma2)) # fast special-case
+white_noise2(sigma2) = Gaussian(SVector(0.0), SMatrix{1,1}(sigma2)) # fast special-case
+white_noise(args...) = white_noise2(args...)  # TODO: eventually have
+                                              # white_noise(sigma) = white_noise2(sigma^2)
+                                              # and maybe stop exporting white_noise2
+                                              # since it's counter-intuitive
+Base.@deprecate white_noise white_noise2
 
 parameters(g::Gaussian) = (mean(g), cov(g))   # convenience
 
