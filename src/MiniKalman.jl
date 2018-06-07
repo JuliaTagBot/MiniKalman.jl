@@ -32,14 +32,10 @@ no_noise() = Gaussian(Zero(), Zero())
 white_noise2(sigma2s...) =
     Gaussian(SVector(ntuple(_->0.0, length(sigma2s))), SDiagonal(sigma2s))
 white_noise2(sigma2) = Gaussian(SVector(0.0), SMatrix{1,1}(sigma2)) # fast special-case
-white_noise(args...) = white_noise2(args...)  # TODO: eventually have
-                                              # white_noise(sigma) = white_noise2(sigma^2)
-                                              # and maybe stop exporting white_noise2
-                                              # since it's counter-intuitive,
-                                              # and deprecate white_noise1
+# TODO: eventually have white_noise = white_noise1 and maybe stop exporting white_noise2
+# since it's counter-intuitive, and deprecate white_noise1.
+# We've been white_noise-free since June 7th.
 white_noise1(args...) = white_noise2((args.^2)...)
-
-Base.@deprecate white_noise white_noise2
 
 parameters(g::Gaussian) = (mean(g), cov(g))   # convenience
 
