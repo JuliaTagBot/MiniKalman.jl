@@ -120,7 +120,7 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
             length(transition_noises) == length(observation_mats) ==
             length(observation_noises),
             "All passed vectors should be of the same length")
-    # For type stability
+    # For type stability, we fake-run it for two iterations. It's rather lame.
     dum_state, _, _ =
         kfilter(initial_state_prior, transition_mats[1], transition_noises[1],
                 observations[1], observation_mats[1], observation_noises[1])
