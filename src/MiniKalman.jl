@@ -85,7 +85,7 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
     filtered_state = Gaussian(μ + K*r,
                               (I - K*C) * Σ)
     ll = logpdf(Gaussian(C * μ, S), y)  # log-likelihood
-    return (filtered_state, ll)
+    return (filtered_state, ll, Gaussian(ŷ, S))
 end
 
 kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
@@ -112,20 +112,25 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
             length(observation_noises),
             "All passed vectors should be of the same length")
     # For type stability
-    T = typeof(kfilter(initial_state_prior, transition_mats[1], transition_noises[1],
-                       observations[1], observation_mats[1], observation_noises[1])[1])
+    dum_state, _, dum_predictive =
+        kfilter(initial_state_prior, transition_mats[1], transition_noises[1],
+                observations[1], observation_mats[1], observation_noises[1])
+    T = typeof(dum_state)
+    P = typeof(dum_predictive)
     filtered_states = Vector{T}(length(observations))
+    predicted_obs = Vector{P}(length(observations))
 
     state = convert(T, initial_state_prior)
     ll_sum = 0.0
     for t in 1:length(observations)
-        (state, ll) =
+        state, ll, predictive =
             kfilter(state, transition_mats[t], transition_noises[t],
                     observations[t], observation_mats[t], observation_noises[t])
         filtered_states[t] = state
+        predicted_obs[t] = predictive
         ll_sum += ll
     end
-    return filtered_states, ll_sum
+    return filtered_states, ll_sum, predicted_obs
 end
 
 """ Compute the smoothed belief state at step `t`, given the `t+1`'th smoothed belief
@@ -147,7 +152,7 @@ function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
         predicted_state(filtered_state, next_transition_mat, next_transition_noise)
 
     # Smoothed state
-    # I don't like to use the inverse (the above equation is in theory more accurate),
+    # I don't like to use the inverse (the other equation is in theory more accurate),
     # but until StaticArrays#73... Note that `lu(::StaticArray)` is defined and might
     # be used, and Σ is positive definite, so there might be faster algorithms.
     J = Σₜₜ * Aₜ₁' * inv(Σₜ₁ₜ)       # backwards Kalman gain matrix
