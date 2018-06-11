@@ -70,7 +70,7 @@ macro kalman_model(def)
                                        $([:($ki[$(Expr(:quote, i))])
                                           for i in input_vars]...))
                 $MiniKalman.$fname($km::$model_type, ::Void,
-                                   $(param_vars...), $(input_vars...))=
+                                   $(param_vars...), $(input_vars...)) =
                 $expr  # the computation is done here
             end
         end

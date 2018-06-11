@@ -30,7 +30,7 @@ Base.:+(::Zero, x) = x
 
 no_noise() = Gaussian(Zero(), Zero())
 white_noise2(sigma2s...) =
-    Gaussian(SVector(ntuple(_->0.0, length(sigma2s))), SDiagonal(sigma2s))
+    Gaussian(zero(SVector(length(sigma2s), Float64)), SDiagonal(sigma2s))
 white_noise2(sigma2) = Gaussian(SVector(0.0), SMatrix{1,1}(sigma2)) # fast special-case
 # TODO: eventually have white_noise = white_noise1 and maybe stop exporting white_noise2
 # since it's counter-intuitive, and deprecate white_noise1.
