@@ -129,18 +129,16 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
     P = typeof(dum_predictive2)
     filtered_states = Vector{T}(length(observations))
     predicted_obs = Vector{P}(length(observations))
+    lls = Vector{Float64}(length(observations))
 
     state = convert(T, initial_state_prior)
-    ll_sum = 0.0
     for t in 1:length(observations)
-        state, ll, predictive =
+        state, lls[t], predicted_obs[t] =
             kfilter(state, transition_mats[t], transition_noises[t],
                     observations[t], observation_mats[t], observation_noises[t])
         filtered_states[t] = state
-        predicted_obs[t] = predictive
-        ll_sum += ll
     end
-    return filtered_states, ll_sum, predicted_obs
+    return filtered_states, lls, predicted_obs
 end
 
 function log_likelihood(initial_state_prior::Gaussian, observations::AbstractVector,
