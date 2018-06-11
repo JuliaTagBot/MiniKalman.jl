@@ -30,8 +30,10 @@ Base.:+(::Zero, x) = x
 
 no_noise() = Gaussian(Zero(), Zero())
 white_noise2(sigma2s...) =
-    Gaussian(zero(SVector(length(sigma2s), Float64)), SDiagonal(sigma2s))
-white_noise2(sigma2) = Gaussian(SVector(0.0), SMatrix{1,1}(sigma2)) # fast special-case
+    Gaussian(zero(SVector{length(sigma2s), Float64}), SDiagonal(sigma2s))
+# fast special-cases
+white_noise2(a) = Gaussian(SVector(0.0), SMatrix{1,1}(a)) 
+white_noise2(a, b) = Gaussian(SVector(0.0, 0.0), SDiagonal(a, b))
 # TODO: eventually have white_noise = white_noise1 and maybe stop exporting white_noise2
 # since it's counter-intuitive, and deprecate white_noise1.
 # We've been white_noise-free since June 7th.
