@@ -245,7 +245,7 @@ end
 
 """ `Positive(Gaussian(...))` is a distribution that samples from `Gaussian`, but
 rejects all negative samples. """
-struct Positive
+struct Positive   # JUN11: not used anymore
     distribution
 end
 
