@@ -83,16 +83,17 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
 
     # Prediction step (μ_(t|t-1), Σ_(t|t-1))
     μ, Σ = predicted_state(state_prior, transition_mat, transition_noise) 
+    ŷ = C * μ + Du               # Murphy forgot the Du term in his book
+    S = C * Σ * C' + R
+    predicted_obs = Gaussian(ŷ, S)
     
     # Filter
-    S = C * Σ * C' + R
     K = Σ * C' / S         # Kalman gain matrix
-    ŷ = C * μ + Du
     r = y - ŷ
     filtered_state = Gaussian(μ + K*r,
                               (I - K*C) * Σ)
-    ll = logpdf(Gaussian(C * μ, S), y)  # log-likelihood
-    return (filtered_state, ll, Gaussian(ŷ, S))
+    ll = logpdf(predicted_obs, y)  # log-likelihood
+    return (filtered_state, ll, predicted_obs)
 end
 
 kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
