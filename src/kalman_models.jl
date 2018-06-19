@@ -38,7 +38,7 @@ kalman_quantities = [:observation_mat, :observation_mats, #:initial_state,
                      :observation_noise, :observation_noises, 
                      :transition_mat, :transition_mats,
                      :transition_noise, :transition_noises,
-                     :labels]
+                     :initial_state, :labels]
 for q in kalman_quantities
     @eval function $q end  # forward declarations
 end
@@ -123,13 +123,15 @@ observation_mats(m, inputs::Inputs) = Fill(observation_mat(m, inputs), length(in
 ################################################################################
 ## Delegations
 
-kalman_filter(m::Model, inputs::Inputs, observations::AbstractVector, initial_state) = 
+kalman_filter(m::Model, inputs::Inputs, observations::AbstractVector,
+              initial_state=initial_state(m, inputs)) = 
     kalman_filter(initial_state, observations,
                   observation_noises(m, inputs),
                   transition_mats(m, inputs),
                   transition_noises(m, inputs),
                   observation_mats(m, inputs))
-log_likelihood(m::Model, inputs::Inputs, observations::AbstractVector, initial_state) = 
+log_likelihood(m::Model, inputs::Inputs, observations::AbstractVector,
+               initial_state=initial_state(m, inputs)) = 
     log_likelihood(initial_state, observations,
                    observation_noises(m, inputs),
                    transition_mats(m, inputs),
@@ -141,10 +143,11 @@ kalman_smoother(m::Model, inputs::Inputs, filtered_states::AbstractVector{<:Gaus
                     transition_mats=transition_mats(m, inputs),
                     transition_noises=transition_noises(m, inputs))
 kalman_smoother(m::Model, inputs::Inputs, observations::AbstractVector,
-                initial_state::Gaussian) =
+                initial_state::Gaussian=initial_state(m, inputs)) =
     kalman_smoother(m, inputs, kalman_filter(m, inputs, observations, initial_state)[1])
 
-kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG, initial_state) =
+kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG,
+              initial_state=initial_state(m, inputs)) =
     kalman_sample(rng, initial_state, observation_noises(m, inputs);
                   transition_mats=transition_mats(m, inputs),
                   transition_noises=transition_noises(m, inputs),
@@ -156,7 +159,8 @@ kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG, initial_state) =
 """ Finds a set of model parameters that attempts to maximize the log-likelihood
 on the given dataset. Returns `(best_model, optim_object)`. """
 function Optim.optimize(model0::Model, inputs::Inputs,
-                        observations::AbstractVector, initial_state;
+                        observations::AbstractVector,
+                        initial_state=initial_state(model0, inputs);
                         min=0.0, # 0.0 is a bit arbitrary...
                         parameters_to_optimize=fieldnames(model0), 
                         method=LBFGS(linesearch=Optim.LineSearches.BackTracking()),
@@ -228,7 +232,8 @@ data generated from the model.
 Concretely, we sample observations and hidden state from `true_model` for the
 given `inputs`, then call `optimize` on `true_model * fuzz_factor`."""
 function sample_and_recover(true_model::Model, inputs::Inputs,
-                            rng, initial_state::Gaussian;
+                            rng,
+                            initial_state::Gaussian=initial_state(true_model, inputs);
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model)))),
                             start_model=nothing)
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
