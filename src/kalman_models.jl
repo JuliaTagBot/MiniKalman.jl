@@ -1,6 +1,8 @@
 using MacroTools
+using MacroTools: postwalk
 using Parameters
 using Optim
+using QuickTypes
 import GaussianDistributions
 
 include("identities.jl")
@@ -34,7 +36,7 @@ marginal_std(g::Gaussian) = sqrt.(diag(cov(g)))
 marginal_std(g::Gaussian, i::Int) = sqrt(diag(cov(g))[i])
 
 
-kalman_quantities = [:observation_mat, :observation_mats, #:initial_state,
+kalman_quantities = [:observation_mat, :observation_mats, 
                      :observation_noise, :observation_noises, 
                      :transition_mat, :transition_mats,
                      :transition_noise, :transition_noises,
@@ -43,36 +45,54 @@ for q in kalman_quantities
     @eval function $q end  # forward declarations
 end
 
+@qstruct_fp EvaluatedInputs(observation_mats, observation_noises, transition_mats,
+                            transition_noises, initial_state)
+const EInputs = Union{Inputs, EvaluatedInputs}
+eval_inputs(::Model, ei::EvaluatedInputs) = ei
+for q in fieldnames(EvaluatedInputs)
+    @eval $q(::Model, ei::EvaluatedInputs) = $q(ei)
+    @eval $q(ei::EvaluatedInputs) = ei.$q
+end
+
+singular_qty_defaults = quote
+    transition_mat = $MiniKalman.Identity()
+    transition_noise = $MiniKalman.no_noise()
+    observation_mat = $MiniKalman.Identity()
+end
+
+# singular_qty_defaults =
+#     Dict(:transition_mat=>:($MiniKalman.Identity()),
+#          :transition_noise=>:($MiniKalman.no_noise()),
+#          :observation_mat=>:($MiniKalman.Identity()))
+
+qty_defaults = Dict(:transition_mats=>:($MiniKalman.Fill(transition_mat, _N)),
+                    :transition_noises=>:($MiniKalman.Fill(transition_noise, _N)),
+                    :observation_noises=>:($MiniKalman.Fill(observation_noise, _N)),
+                    :observation_mats=>:($MiniKalman.Fill(observation_mat, _N)))
 
 """ See notebook 06 for examples. """
 macro kalman_model(def)
-    @assert(@capture(def, model_type_(; params__) do input_vars__; qtydefs__ end),
+    @assert(@capture(def, model_type_(; params__) do input_vars__; qtydefs0_ end),
             "Use @kalman_model M(; param1=..., param2=...) do input1, input2, ... end)")
     inputs_type = Symbol(model_type, "Inputs")
     param_vars = map(first ∘ splitarg, params)
 
     @gensym km ki
-    fundefs = map(qtydefs) do c
-        @assert(@capture(c, fname_ := expr_), "Bad quantity definition: $c")
-        @assert(fname in kalman_quantities,
-                "`$fname` is not a valid Kalman model quantity ($kalman_quantities)")
-        if fname == :labels
-            quote
-                $MiniKalman.labels($km::$model_type) = $expr
+    defined = []  # TODO: use @defined in 0.7
+    label_def = nothing
+    qtydefs = postwalk(qtydefs0) do x
+        # Turn := into =. := is essentially deprecated (July'18)
+        if @capture(x, a_ := b_)
+            push!(defined, a)
+            if a == :labels
+                label_def = 
+                    quote
+                        $MiniKalman.labels($km::$model_type) = $b
+                    end
             end
+            :($a = $b)
         else
-            quote
-                $MiniKalman.$fname($km::$model_type, $ki::$MiniKalman.Inputs) =
-                    # We break $fname in two definitions, because `expr` should
-                    # be evaluated in an environment where all types are known.
-                    $MiniKalman.$fname($km, nothing,
-                                       $([:($km.$p) for p in param_vars]...),
-                                       $([:($ki[$(Expr(:quote, i))])
-                                          for i in input_vars]...))
-                $MiniKalman.$fname($km::$model_type, ::Void,
-                                   $(param_vars...), $(input_vars...)) =
-                $expr  # the computation is done here
-            end
+            x
         end
     end
 
@@ -84,7 +104,25 @@ macro kalman_model(def)
         $MiniKalman.@with_kw struct $model_type <: $(MiniKalman.Model) # Parameters.jl#56
             $(map(proc_param, params)...)
         end
-        $(fundefs...)
+        $label_def
+        $MiniKalman.eval_inputs($km::$model_type, $ki::$MiniKalman.Inputs) =
+            # We break $eval_inputs in two definitions, because `expr` should
+            # be evaluated in an environment where all types are known.
+            $MiniKalman.eval_inputs($km, nothing, $ki,
+                                    $([:($km.$p) for p in param_vars]...),
+                                    $([:($ki[$(Expr(:quote, i))])
+                                       for i in input_vars]...))
+        function $MiniKalman.eval_inputs($km::$model_type, ::Void,
+                                         $ki::$MiniKalman.Inputs,
+                                         $(param_vars...), $(input_vars...))
+            _N = length($ki)
+            $singular_qty_defaults
+            # $([:($qty = nothing) for qty in fieldnames(EvaluatedInputs)]...)
+            $qtydefs
+            # $MiniKalman.EvaluatedInputs($(fieldnames(EvaluatedInputs)...))
+            $MiniKalman.EvaluatedInputs($([qty in defined ? qty : qty_defaults[qty]
+                                           for qty in fieldnames(EvaluatedInputs)]...))
+        end
         $model_type
     end)
 end
@@ -123,35 +161,49 @@ observation_mats(m, inputs::Inputs) = Fill(observation_mat(m, inputs), length(in
 ################################################################################
 ## Delegations
 
-kalman_filter(m::Model, inputs::Inputs, observations::AbstractVector,
-              initial_state=initial_state(m, inputs)) = 
-    kalman_filter(initial_state, observations,
+function kalman_filter(m::Model, inputs0::EInputs, observations::AbstractVector,
+                       initial_state=nothing)
+    inputs = eval_inputs(m, inputs0)
+    kalman_filter(initial_state===nothing ? inputs.initial_state : initial_state,
+                  observations,
                   observation_noises(m, inputs),
                   transition_mats(m, inputs),
                   transition_noises(m, inputs),
                   observation_mats(m, inputs))
-log_likelihood(m::Model, inputs::Inputs, observations::AbstractVector,
-               initial_state=initial_state(m, inputs)) = 
-    log_likelihood(initial_state, observations,
-                   observation_noises(m, inputs),
-                   transition_mats(m, inputs),
-                   transition_noises(m, inputs),
-                   observation_mats(m, inputs))
+end
+function log_likelihood(m::Model, inputs0::EInputs, observations::AbstractVector,
+                        initial_state=nothing)
+    inputs = eval_inputs(m, inputs0)
+    log_likelihood(initial_state===nothing ? inputs.initial_state : initial_state,
+                   observations,
+                   observation_noises(inputs),
+                   transition_mats(inputs),
+                   transition_noises(inputs),
+                   observation_mats(inputs))
+end
 
-kalman_smoother(m::Model, inputs::Inputs, filtered_states::AbstractVector{<:Gaussian}) =
+function kalman_smoother(m::Model, inputs0::EInputs,
+                         filtered_states::AbstractVector{<:Gaussian})
+    inputs = eval_inputs(m, inputs0)
     kalman_smoother(filtered_states;
                     transition_mats=transition_mats(m, inputs),
                     transition_noises=transition_noises(m, inputs))
-kalman_smoother(m::Model, inputs::Inputs, observations::AbstractVector,
-                initial_state::Gaussian=initial_state(m, inputs)) =
+end
+function kalman_smoother(m::Model, inputs0::EInputs, observations::AbstractVector,
+                         initial_state=nothing)
+    inputs = eval_inputs(m, inputs0)
     kalman_smoother(m, inputs, kalman_filter(m, inputs, observations, initial_state)[1])
+end
 
-kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG,
-              initial_state=initial_state(m, inputs)) =
-    kalman_sample(rng, initial_state, observation_noises(m, inputs);
-                  transition_mats=transition_mats(m, inputs),
-                  transition_noises=transition_noises(m, inputs),
-                  observation_mats=observation_mats(m, inputs))
+function kalman_sample(m::Model, inputs0::EInputs, rng::AbstractRNG,
+                       initial_state=nothing)
+    inputs = eval_inputs(m, inputs0)
+    kalman_sample(rng, initial_state===nothing ? inputs.initial_state : initial_state,
+                  observation_noises(inputs);
+                  transition_mats=transition_mats(inputs),
+                  transition_noises=transition_noises(inputs),
+                  observation_mats=observation_mats(inputs))
+end
 
 ################################################################################
 # Optimization
@@ -160,7 +212,7 @@ kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG,
 on the given dataset. Returns `(best_model, optim_object)`. """
 function Optim.optimize(model0::Model, inputs::Inputs,
                         observations::AbstractVector,
-                        initial_state=initial_state(model0, inputs);
+                        initial_state=nothing;
                         min=0.0, # 0.0 is a bit arbitrary...
                         parameters_to_optimize=fieldnames(model0), 
                         method=LBFGS(linesearch=Optim.LineSearches.BackTracking()),
@@ -231,18 +283,18 @@ data generated from the model.
 
 Concretely, we sample observations and hidden state from `true_model` for the
 given `inputs`, then call `optimize` on `true_model * fuzz_factor`."""
-function sample_and_recover(true_model::Model, inputs::Inputs,
-                            rng,
-                            initial_state::Gaussian=initial_state(true_model, inputs);
+function sample_and_recover(true_model::Model, inputs::Inputs, rng;
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model)))),
                             start_model=nothing)
+    einputs = eval_inputs(true_model, inputs)
+    state0 = initial_state(true_model, einputs)::Gaussian
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
-    true_state, obs = kalman_sample(true_model, inputs, rng, rand(rng, initial_state))
+    true_state, obs = kalman_sample(true_model, einputs, rng, rand(rng, state0))
     if start_model === nothing
         start_model = set_params(true_model, get_params(true_model) .* fuzz_factor)
     end
-    (best_model, o) = optimize(start_model, inputs, obs, initial_state)
-    estimated_state = kalman_smoother(best_model, inputs, obs, initial_state)
+    (best_model, o) = optimize(start_model, inputs, obs, state0)
+    estimated_state = kalman_smoother(best_model, inputs, obs, state0)
     return RecoveryResults(true_model, best_model, true_state, estimated_state, obs, o)
 end
 
