@@ -5,8 +5,6 @@ using Optim
 using QuickTypes
 import GaussianDistributions
 
-include("identities.jl")
-
 export @kalman_model, sample_and_recover, optimize
 
 abstract type Model end
