@@ -25,6 +25,9 @@ Base.transpose(::Identity) = Identity()
 struct Zero end
 Base.:+(x, ::Zero) = x
 Base.:+(::Zero, x) = x
+Base.:*(x, ::Zero) = zero(x)
+Base.:*(::Zero, x) = zero(x)
+Base.transpose(z::Zero) = z
 
 ################################################################################
 
