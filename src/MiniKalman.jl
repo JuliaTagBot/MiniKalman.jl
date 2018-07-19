@@ -12,14 +12,14 @@ export kfilter, kalman_filter, white_noise, white_noise1, white_noise2,
 #
 # FillArrays.jl has `Zero` and `Eye`, which are good, but:
 #  - vec + Zero(2) creates a new `vec` instead of returning `vec`, which is wasteful
-#  - They include type info and length, which are kinda annoying to specify.
-#    I just want a clean algebraic object.
+#  - They include type info and length, which are annoying to specify.
+#    We just need a clean algebraic object.
 
 struct Identity end
 Base.:*(::Identity, x) = x
 Base.:*(x, ::Identity) = x
-Base.:*(g::Gaussian, ::Identity) = g  # disambiguate
-Base.:*(::Identity, g::Gaussian) = g  # disambiguate
+Base.:*(g::Gaussian, ::Identity) = g  # disambiguation
+Base.:*(::Identity, g::Gaussian) = g  # disambiguation
 Base.transpose(::Identity) = Identity()
 
 struct Zero end
