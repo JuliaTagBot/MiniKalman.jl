@@ -113,11 +113,11 @@ kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
 # I split off the non-kwarg version mostly for `@code_warntype` ease. Revisit in 0.7?
 # It turned out to have a negligible impact on performance anyway. The bottle-neck
 # was elsewhere. TODO: merge them together again?
-function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
+function kalman_filter(initial_state_prior::T, observations::AbstractVector,
                        observation_noises::AbstractVector{<:Gaussian},
                        transition_mats::AbstractVector,
                        transition_noises::AbstractVector{<:Gaussian},
-                       observation_mats::AbstractVector)
+                       observation_mats::AbstractVector) where T <: Gaussian
     @assert(length(observations) == length(transition_mats) ==
             length(transition_noises) == length(observation_mats) ==
             length(observation_noises),
@@ -129,13 +129,12 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
     dum_state2, _, dum_predictive2 =
         kfilter(dum_state, transition_mats[2], transition_noises[2],
                 observations[2], observation_mats[2], observation_noises[2])
-    T = typeof(dum_state2)
     P = typeof(dum_predictive2)
     filtered_states = Vector{T}(length(observations))
     predicted_obs = Vector{P}(length(observations))
     lls = Vector{Float64}(length(observations))
 
-    state = convert(T, initial_state_prior)
+    state = initial_state_prior
     for t in 1:length(observations)
         state, lls[t], predicted_obs[t] =
             kfilter(state, transition_mats[t], transition_noises[t],
