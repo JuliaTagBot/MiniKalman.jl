@@ -122,14 +122,12 @@ function kalman_filter(initial_state_prior::T, observations::AbstractVector,
             length(transition_noises) == length(observation_mats) ==
             length(observation_noises),
             "All passed vectors should be of the same length")
-    # For type stability, we fake-run it for two iterations. It's rather lame.
-    dum_state, _, _ =
+    # For type stability, we fake-run it. It's rather lame. Ideally, we'd build the
+    # output type
+    _, _, dum_predictive =
         kfilter(initial_state_prior, transition_mats[1], transition_noises[1],
                 observations[1], observation_mats[1], observation_noises[1])
-    dum_state2, _, dum_predictive2 =
-        kfilter(dum_state, transition_mats[2], transition_noises[2],
-                observations[2], observation_mats[2], observation_noises[2])
-    P = typeof(dum_predictive2)
+    P = typeof(dum_predictive)
     filtered_states = Vector{T}(length(observations))
     predicted_obs = Vector{P}(length(observations))
     lls = Vector{Float64}(length(observations))
