@@ -1,3 +1,5 @@
+# This code is 100% built _on top_ of MiniKalman.jl
+
 using MacroTools
 using MacroTools: postwalk
 using Parameters
