@@ -147,7 +147,7 @@ function log_likelihood(initial_state_prior::T, observations::AbstractVector,
                         transition_mats::AbstractVector,
                         transition_noises::AbstractVector{<:Gaussian},
                         observation_mats::AbstractVector) where T <: Gaussian
-    # Specialized version that doesn't allocate at all.
+    # Specialized version that doesn't allocate at all. Useful for parameter optimization.
     ll_sum = 0.0
     state = initial_state_prior
     for t in 1:length(observations)
