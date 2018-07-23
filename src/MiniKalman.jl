@@ -41,6 +41,7 @@ white_noise2(a, b) = Gaussian(SVector(0.0, 0.0), SDiagonal(a, b))
 # since it's counter-intuitive, and deprecate white_noise1.
 # We've been white_noise-free since June 7th.
 white_noise1(args...) = white_noise2((args.^2)...)
+white_noise(args...) = white_noise1(args...)
 
 parameters(g::Gaussian) = (mean(g), cov(g))   # convenience
 
