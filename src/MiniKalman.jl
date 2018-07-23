@@ -123,7 +123,7 @@ function kalman_filter(initial_state_prior::T, observations::AbstractVector,
             length(observation_noises),
             "All passed vectors should be of the same length")
     # For type stability, we fake-run it. It's rather lame. Ideally, we'd build the
-    # output type
+    # output type from the input types
     _, _, dum_predictive =
         kfilter(initial_state_prior, transition_mats[1], transition_noises[1],
                 observations[1], observation_mats[1], observation_noises[1])
@@ -142,18 +142,14 @@ function kalman_filter(initial_state_prior::T, observations::AbstractVector,
     return filtered_states, lls, predicted_obs
 end
 
-function log_likelihood(initial_state_prior::Gaussian, observations::AbstractVector,
+function log_likelihood(initial_state_prior::T, observations::AbstractVector,
                         observation_noises::AbstractVector{<:Gaussian},
                         transition_mats::AbstractVector,
                         transition_noises::AbstractVector{<:Gaussian},
-                        observation_mats::AbstractVector)
+                        observation_mats::AbstractVector) where T <: Gaussian
     # Specialized version that doesn't allocate at all.
-    dum_state, _, _ =
-        kfilter(initial_state_prior, transition_mats[1], transition_noises[1],
-                observations[1], observation_mats[1], observation_noises[1])
-    T = typeof(dum_state)
     ll_sum = 0.0
-    state = convert(T, initial_state_prior)
+    state = initial_state_prior
     for t in 1:length(observations)
         state, ll, predictive =
             kfilter(state, transition_mats[t], transition_noises[t],
