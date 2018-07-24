@@ -111,31 +111,44 @@ kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
                   observation_noises, transition_mats, transition_noises,
                   observation_mats)
 
+""" `make_full` is a helper """
+make_full(v) = v
+make_full(g::Gaussian) = Gaussian(make_full(mean(g)), make_full(cov(g)))
+make_full(d::Diagonal) = convert(Matrix, d)
+# See StaticArrays#468. We should probably use Diagonal() in 0.7
+make_full(d::SDiagonal{1, Float64}) = @SMatrix [d[1,1]]
+make_full(d::SDiagonal{2, Float64}) = @SMatrix [d[1,1] 0.0; 0.0 d[2,2]]
+make_full(d::SDiagonal{N}) where N =  # this version allocates on 0.6!!!
+    convert(SMatrix{N,N}, Diagonal(diag(d)))
+
 # I split off the non-kwarg version mostly for `@code_warntype` ease. Revisit in 0.7?
 # It turned out to have a negligible impact on performance anyway. The bottle-neck
 # was elsewhere. TODO: merge them together again?
-function kalman_filter(initial_state_prior::T, observations::AbstractVector,
+function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
                        observation_noises::AbstractVector{<:Gaussian},
                        transition_mats::AbstractVector,
                        transition_noises::AbstractVector{<:Gaussian},
-                       observation_mats::AbstractVector) where T <: Gaussian
+                       observation_mats::AbstractVector)
     @assert(length(observations) == length(transition_mats) ==
             length(transition_noises) == length(observation_mats) ==
             length(observation_noises),
             "All passed vectors should be of the same length")
+    state = make_full(initial_state_prior)  # we need make_full to that the state does
+
+    # not change type during iteration
     # For type stability, we fake-run it. It's rather lame. Ideally, we'd build the
     # output type from the input types
     _, _, dum_predictive =
         kfilter(initial_state_prior, transition_mats[1], transition_noises[1],
                 observations[1], observation_mats[1], observation_noises[1])
     P = typeof(dum_predictive)
+    T = typeof(state)
     filtered_states = Vector{T}(length(observations))
     predicted_obs = Vector{P}(length(observations))
     lls = Vector{Float64}(length(observations))
 
-    state = initial_state_prior
     for t in 1:length(observations)
-        state, lls[t], predicted_obs[t] =
+        state::T, lls[t], predicted_obs[t] =
             kfilter(state, transition_mats[t], transition_noises[t],
                     observations[t], observation_mats[t], observation_noises[t])
         filtered_states[t] = state
@@ -143,14 +156,14 @@ function kalman_filter(initial_state_prior::T, observations::AbstractVector,
     return filtered_states, lls, predicted_obs
 end
 
-function log_likelihood(initial_state_prior::T, observations::AbstractVector,
+function log_likelihood(initial_state_prior::Gaussian, observations::AbstractVector,
                         observation_noises::AbstractVector{<:Gaussian},
                         transition_mats::AbstractVector,
                         transition_noises::AbstractVector{<:Gaussian},
-                        observation_mats::AbstractVector) where T <: Gaussian
+                        observation_mats::AbstractVector)
     # Specialized version that doesn't allocate at all. Useful for parameter optimization.
     ll_sum = 0.0
-    state = initial_state_prior
+    state = make_full(initial_state_prior)
     for t in 1:length(observations)
         state, ll, predictive =
             kfilter(state, transition_mats[t], transition_noises[t],
