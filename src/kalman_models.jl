@@ -47,6 +47,7 @@ end
 
 @qstruct_fp EvaluatedInputs(observation_mats, observation_noises, transition_mats,
                             transition_noises, initial_state)
+Base.length(ei::EvaluatedInputs) = length(ei.observation_mats)
 const EInputs = Union{Inputs, EvaluatedInputs}
 eval_inputs(::Model, ei::EvaluatedInputs) = ei
 for q in fieldnames(EvaluatedInputs)
