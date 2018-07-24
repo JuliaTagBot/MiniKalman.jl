@@ -148,10 +148,10 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
     lls = Vector{Float64}(length(observations))
 
     for t in 1:length(observations)
-        state::T, lls[t], predicted_obs[t] =
+        state, lls[t], predicted_obs[t] =
             kfilter(state, transition_mats[t], transition_noises[t],
                     observations[t], observation_mats[t], observation_noises[t])
-        filtered_states[t] = state
+        filtered_states[t] = state::T
     end
     return filtered_states, lls, predicted_obs
 end
