@@ -2,6 +2,7 @@ module MiniKalman
 
 using GaussianDistributions, FillArrays
 using GaussianDistributions: dim, logpdf
+using MappedArrays
 using StaticArrays
 
 export kfilter, kalman_filter, white_noise, white_noise1, white_noise2,

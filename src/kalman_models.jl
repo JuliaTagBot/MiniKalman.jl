@@ -5,6 +5,7 @@ using MacroTools: postwalk
 using Parameters
 using Optim
 using QuickTypes
+using QuickTypes: roottypeof
 import GaussianDistributions
 
 export @kalman_model, sample_and_recover, optimize
@@ -139,8 +140,14 @@ function set_params(model::Model, params::AbstractVector, names=fieldnames(model
         nvals = length(v)
         upd[name] = params[v isa Number ? i : (i:i+nvals-1)]
         i += nvals
-    end    
-    return typeof(model)(model; upd...)
+    end
+    kwargs = map(fieldnames(model)) do f
+        f=>get(upd, f) do
+            getfield(model, f)
+        end
+    end
+    # Assumes that there's a pure-kwarg constructor of the object
+    return roottypeof(model)(; kwargs...)
 end
 get_params(model::Model, names=fieldnames(model)) =
     Float64[x for v in names for x in getfield(model, v)]
@@ -148,24 +155,32 @@ get_params(model::Model, names=fieldnames(model)) =
 
 ################################################################################
 ## Defaults
-transition_mat(m, inputs::Inputs) = Identity()
-transition_mats(m, inputs::Inputs) = Fill(transition_mat(m, inputs), length(inputs))
-transition_noise(m, inputs::Inputs) = no_noise()
-transition_noises(m, inputs::Inputs) = Fill(transition_noise(m, inputs), length(inputs))
+transition_mat(m, inputs, i) = Identity()
+transition_mats(m, inputs) = mappedarray(i->transition_mat(m, inputs, i),
+                                         1:length(inputs))
+transition_noise(m, inputs, i) = no_noise()
+transition_noises(m, inputs) = mappedarray(i->transition_noise(m, inputs, i),
+                                           1:length(inputs))
 # observation_noise(inputs::Inputs) = no_noise() is tempting, but it's
 # a degenerate Kalman model, which causes problems
-observation_noises(m, inputs::Inputs) = Fill(observation_noise(m, inputs), length(inputs))
-observation_mat(m, inputs::Inputs) = Identity()
-observation_mats(m, inputs::Inputs) = Fill(observation_mat(m, inputs), length(inputs))
+observation_noises(m, inputs) = mappedarray(i->observation_noise(m, inputs, i),
+                                            1:length(inputs))
+observation_mat(m, inputs, i) = Identity()
+observation_mats(m, inputs) = mappedarray(i->observation_mat(m, inputs, i),
+                                          1:length(inputs))
 
 
 ################################################################################
 ## Delegations
 
+# TODO: shouldn't be necessary
+initial_state(m::Model, ::Void) = MiniKalman.initial_state(m)
+initial_state(m::Model, initial_state) = initial_state
+
 function kalman_filter(m::Model, inputs0::EInputs, observations::AbstractVector,
                        initial_state=nothing)
     inputs = eval_inputs(m, inputs0)
-    kalman_filter(initial_state===nothing ? inputs.initial_state : initial_state,
+    kalman_filter(MiniKalman.initial_state(m, initial_state),
                   observations,
                   observation_noises(m, inputs),
                   transition_mats(m, inputs),
@@ -175,12 +190,12 @@ end
 function log_likelihood(m::Model, inputs0::EInputs, observations::AbstractVector,
                         initial_state=nothing)
     inputs = eval_inputs(m, inputs0)
-    log_likelihood(initial_state===nothing ? inputs.initial_state : initial_state,
+    log_likelihood(MiniKalman.initial_state(m, initial_state),
                    observations,
-                   observation_noises(inputs),
-                   transition_mats(inputs),
-                   transition_noises(inputs),
-                   observation_mats(inputs))
+                   observation_noises(m, inputs),
+                   transition_mats(m, inputs),
+                   transition_noises(m, inputs),
+                   observation_mats(m, inputs))
 end
 
 function kalman_smoother(m::Model, inputs0::EInputs,
@@ -199,11 +214,11 @@ end
 function kalman_sample(m::Model, inputs0::EInputs, rng::AbstractRNG,
                        initial_state=nothing)
     inputs = eval_inputs(m, inputs0)
-    kalman_sample(rng, initial_state===nothing ? inputs.initial_state : initial_state,
-                  observation_noises(inputs);
-                  transition_mats=transition_mats(inputs),
-                  transition_noises=transition_noises(inputs),
-                  observation_mats=observation_mats(inputs))
+    kalman_sample(rng, MiniKalman.initial_state(m, initial_state),
+                  observation_noises(m, inputs);
+                  transition_mats=transition_mats(m, inputs),
+                  transition_noises=transition_noises(m, inputs),
+                  observation_mats=observation_mats(m, inputs))
 end
 
 ################################################################################
@@ -289,7 +304,7 @@ function sample_and_recover(true_model::Model, inputs::Inputs, rng;
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model, parameters_to_optimize)))),
                             start_model=nothing)
     einputs = eval_inputs(true_model, inputs)
-    state0 = initial_state(true_model, einputs)::Gaussian
+    state0 = initial_state(true_model)::Gaussian
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
     true_state, obs = kalman_sample(true_model, einputs, rng, rand(rng, state0))
     if start_model === nothing
