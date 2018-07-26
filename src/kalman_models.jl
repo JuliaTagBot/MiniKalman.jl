@@ -285,16 +285,21 @@ data generated from the model.
 Concretely, we sample observations and hidden state from `true_model` for the
 given `inputs`, then call `optimize` on `true_model * fuzz_factor`."""
 function sample_and_recover(true_model::Model, inputs::Inputs, rng;
-                            fuzz_factor=exp.(randn(rng, length(get_params(true_model)))),
+                            parameters_to_optimize=fieldnames(true_model),
+                            fuzz_factor=exp.(randn(rng, length(get_params(true_model, parameters_to_optimize)))),
                             start_model=nothing)
     einputs = eval_inputs(true_model, inputs)
     state0 = initial_state(true_model, einputs)::Gaussian
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
     true_state, obs = kalman_sample(true_model, einputs, rng, rand(rng, state0))
     if start_model === nothing
-        start_model = set_params(true_model, get_params(true_model) .* fuzz_factor)
+        start_model = set_params(true_model,
+                                 (get_params(true_model, parameters_to_optimize) .*
+                                  fuzz_factor),
+                                 parameters_to_optimize)
     end
-    (best_model, o) = optimize(start_model, inputs, obs, state0)
+    (best_model, o) = optimize(start_model, inputs, obs, state0;
+                               parameters_to_optimize=parameters_to_optimize)
     estimated_state = kalman_smoother(best_model, inputs, obs, state0)
     return RecoveryResults(true_model, best_model, true_state, estimated_state, obs, o)
 end
