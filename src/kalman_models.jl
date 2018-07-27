@@ -159,43 +159,63 @@ get_params(model::Model, names=fieldnames(model)) =
 
 ################################################################################
 ## Defaults
-transition_mat(m, inputs, i) = Identity()
-transition_mats(m, inputs) = mappedarray(i->transition_mat(m, inputs, i),
-                                         1:length(inputs))
-transition_noise(m, inputs, i) = no_noise()
-transition_noises(m, inputs) = mappedarray(i->transition_noise(m, inputs, i),
-                                           1:length(inputs))
+transition_mat(m, inputs, i) = Identity() #transition_noises(m, inputs)[i]
+#transition_mats(m, inputs) = Fill(Identity(), length(inputs))
+transition_noise(m, inputs, i) = Zero() #transition_noises(m, inputs)[i]
+#transition_noises(m, inputs) = Fill(Zero(), length(inputs))
 # observation_noise(inputs::Inputs) = no_noise() is tempting, but it's
 # a degenerate Kalman model, which causes problems
-observation_noises(m, inputs) = mappedarray(i->observation_noise(m, inputs, i),
-                                            1:length(inputs))
-observation_mat(m, inputs, i) = Identity()
-observation_mats(m, inputs) = mappedarray(i->observation_mat(m, inputs, i),
-                                          1:length(inputs))
+#observation_noise(m, inputs, i) = observation_noises(m, inputs)[i]
+observation_mat(m, inputs, i) = Identity() #observation_mats(m, inputs)[i]
+#observation_mats(m, inputs) = Fill(Identity(), length(inputs))
 
 
 ################################################################################
 ## Delegations
 
-function kalman_filter(m::Model, inputs0::EInputs, observations::AbstractVector,
-                       initial_state=MiniKalman.initial_state(m))
-    inputs = eval_inputs(m, inputs0)
-    kalman_filter(initial_state,
-                  observations,
-                  observation_noises(m, inputs),
-                  transition_mats(m, inputs),
-                  transition_noises(m, inputs),
-                  observation_mats(m, inputs))
+kfilter(state_prior::Gaussian, model, inputs, observations, t::Int) =
+    kfilter(state_prior, transition_mat(model, inputs, t),
+            transition_noise(model, inputs, t),
+            observations[t],
+            observation_mat(model, inputs, t),
+            observation_noise(model, inputs, t))
+
+kalman_filter(m::Model, inputs0::EInputs, observations::AbstractVector,
+              initial_state=MiniKalman.initial_state(m)) =
+    kalman_filter_(m, eval_inputs(m, inputs0), observations, initial_state)
+
+function kalman_filter_(m::Model, inputs::EInputs, observations::AbstractVector, initial_state)
+    state = make_full(initial_state)  # we need make_full to that the state does
+
+    # not change type during iteration
+    # For type stability, we fake-run it. It's rather lame. Ideally, we'd build the
+    # output type from the input types
+    _, _, dum_predictive = kfilter(state, m, inputs, observations, 1)
+    P = typeof(dum_predictive)
+    T = typeof(state)
+    filtered_states = Vector{T}(length(observations))
+    predicted_obs = Vector{P}(length(observations))
+    lls = Vector{Float64}(length(observations))
+
+    for t in 1:length(observations)
+        state, lls[t], predicted_obs[t] = kfilter(state, m, inputs, observations, t)
+        filtered_states[t] = state::T
+    end
+    return filtered_states, lls, predicted_obs
 end
-function log_likelihood(m::Model, inputs0::EInputs, observations::AbstractVector,
-                        initial_state=MiniKalman.initial_state(m))
-    inputs = eval_inputs(m, inputs0)
-    log_likelihood(initial_state,
-                   observations,
-                   observation_noises(m, inputs),
-                   transition_mats(m, inputs),
-                   transition_noises(m, inputs),
-                   observation_mats(m, inputs))
+
+log_likelihood(m::Model, inputs0::EInputs, observations::AbstractVector,
+               initial_state=MiniKalman.initial_state(m)) =
+    log_likelihood_(m, eval_inputs(m, inputs0), observations, initial_state)
+
+function log_likelihood_(m::Model, inputs::EInputs, observations, initial_state)
+    ll_sum = 0.0
+    state = make_full(initial_state)
+    for t in 1:length(observations)
+        state, ll, _ = kfilter(state, m, inputs, observations, t)
+        ll_sum += ll
+    end
+    return ll_sum
 end
 
 function kalman_smoother(m::Model, inputs0::EInputs,
