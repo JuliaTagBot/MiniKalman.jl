@@ -173,14 +173,10 @@ observation_mats(m, inputs) = mappedarray(i->observation_mat(m, inputs, i),
 ################################################################################
 ## Delegations
 
-# TODO: shouldn't be necessary
-initial_state(m::Model, ::Void) = MiniKalman.initial_state(m)
-initial_state(m::Model, initial_state) = initial_state
-
 function kalman_filter(m::Model, inputs0::EInputs, observations::AbstractVector,
-                       initial_state=nothing)
+                       initial_state=MiniKalman.initial_state(m))
     inputs = eval_inputs(m, inputs0)
-    kalman_filter(MiniKalman.initial_state(m, initial_state),
+    kalman_filter(initial_state,
                   observations,
                   observation_noises(m, inputs),
                   transition_mats(m, inputs),
@@ -188,9 +184,9 @@ function kalman_filter(m::Model, inputs0::EInputs, observations::AbstractVector,
                   observation_mats(m, inputs))
 end
 function log_likelihood(m::Model, inputs0::EInputs, observations::AbstractVector,
-                        initial_state=nothing)
+                        initial_state=MiniKalman.initial_state(m))
     inputs = eval_inputs(m, inputs0)
-    log_likelihood(MiniKalman.initial_state(m, initial_state),
+    log_likelihood(initial_state,
                    observations,
                    observation_noises(m, inputs),
                    transition_mats(m, inputs),
@@ -206,15 +202,15 @@ function kalman_smoother(m::Model, inputs0::EInputs,
                     transition_noises=transition_noises(m, inputs))
 end
 function kalman_smoother(m::Model, inputs0::EInputs, observations::AbstractVector,
-                         initial_state=nothing)
+                         initial_state=MiniKalman.initial_state(m))
     inputs = eval_inputs(m, inputs0)
     kalman_smoother(m, inputs, kalman_filter(m, inputs, observations, initial_state)[1])
 end
 
 function kalman_sample(m::Model, inputs0::EInputs, rng::AbstractRNG,
-                       initial_state=nothing)
+                       initial_state=MiniKalman.initial_state(m))
     inputs = eval_inputs(m, inputs0)
-    kalman_sample(rng, MiniKalman.initial_state(m, initial_state),
+    kalman_sample(rng, initial_state,
                   observation_noises(m, inputs);
                   transition_mats=transition_mats(m, inputs),
                   transition_noises=transition_noises(m, inputs),
@@ -228,7 +224,7 @@ end
 on the given dataset. Returns `(best_model, optim_object)`. """
 function Optim.optimize(model0::Model, inputs::Inputs,
                         observations::AbstractVector,
-                        initial_state=nothing;
+                        initial_state=MiniKalman.initial_state(model0),;
                         min=0.0, # 0.0 is a bit arbitrary...
                         parameters_to_optimize=fieldnames(model0), 
                         method=LBFGS(linesearch=Optim.LineSearches.BackTracking()),
