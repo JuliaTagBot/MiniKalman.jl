@@ -46,15 +46,19 @@ for q in kalman_quantities
     @eval function $q end  # forward declarations
 end
 
-@qstruct_fp EvaluatedInputs(observation_mats, observation_noises, transition_mats,
-                            transition_noises, initial_state)
-Base.length(ei::EvaluatedInputs) = length(ei.observation_mats)
-const EInputs = Union{Inputs, EvaluatedInputs}
-eval_inputs(::Model, ei::EvaluatedInputs) = ei
-for q in fieldnames(EvaluatedInputs)
-    @eval $q(::Model, ei::EvaluatedInputs) = $q(ei)
-    @eval $q(ei::EvaluatedInputs) = ei.$q
-end
+const EInputs = Inputs
+
+# @qstruct_fp EvaluatedInputs(observation_mats, observation_noises, transition_mats,
+#                             transition_noises, initial_state)
+# Base.length(ei::EvaluatedInputs) = length(ei.observation_mats)
+# const EInputs = Union{Inputs, EvaluatedInputs}
+# eval_inputs(::Model, ei::EvaluatedInputs) = ei
+# for q in fieldnames(EvaluatedInputs)
+#     @eval $q(::Model, ei::EvaluatedInputs) = $q(ei)
+#     @eval $q(ei::EvaluatedInputs) = ei.$q
+# end
+
+eval_inputs(_, inp) = inp  # default - preprocessing
 
 singular_qty_defaults = quote
     transition_mat = $MiniKalman.Identity()
