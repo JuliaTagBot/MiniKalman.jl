@@ -184,9 +184,9 @@ kalman_filter(m::Model, inputs0::EInputs, observations::AbstractVector,
               initial_state=MiniKalman.initial_state(m)) =
     kalman_filter_(m, eval_inputs(m, inputs0), observations, initial_state)
 
-function kalman_filter_(m::Model, inputs::EInputs, observations::AbstractVector, initial_state)
+function kalman_filter_(m::Model, inputs::EInputs, observations::AbstractVector,
+                        initial_state)
     state = make_full(initial_state)  # we need make_full to that the state does
-
     # not change type during iteration
     # For type stability, we fake-run it. It's rather lame. Ideally, we'd build the
     # output type from the input types
@@ -218,12 +218,14 @@ function log_likelihood_(m::Model, inputs::EInputs, observations, initial_state)
     return ll_sum
 end
 
+map_i(f, m, inputs) = mappedarray(i->f(m, inputs, i), 1:length(inputs))
+
 function kalman_smoother(m::Model, inputs0::EInputs,
                          filtered_states::AbstractVector{<:Gaussian})
     inputs = eval_inputs(m, inputs0)
     kalman_smoother(filtered_states;
-                    transition_mats=transition_mats(m, inputs),
-                    transition_noises=transition_noises(m, inputs))
+                    transition_mats=map_i(transition_mat, m, inputs),
+                    transition_noises=map_i(transition_noise, m, inputs))
 end
 function kalman_smoother(m::Model, inputs0::EInputs, observations::AbstractVector,
                          initial_state=MiniKalman.initial_state(m))
@@ -235,10 +237,10 @@ function kalman_sample(m::Model, inputs0::EInputs, rng::AbstractRNG,
                        initial_state=MiniKalman.initial_state(m))
     inputs = eval_inputs(m, inputs0)
     kalman_sample(rng, initial_state,
-                  observation_noises(m, inputs);
-                  transition_mats=transition_mats(m, inputs),
-                  transition_noises=transition_noises(m, inputs),
-                  observation_mats=observation_mats(m, inputs))
+                  map_i(observation_noise, m, inputs);
+                  transition_mats=map_i(transition_mat, m, inputs),
+                  transition_noises=map_i(transition_noise, m, inputs),
+                  observation_mats=map_i(observation_mat, m, inputs))
 end
 
 ################################################################################
