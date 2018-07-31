@@ -186,8 +186,8 @@ kalman_filter(m::Model, inputs0::EInputs, observations::AbstractVector,
 
 function kalman_filter_(m::Model, inputs::EInputs, observations::AbstractVector,
                         initial_state)
-    state = make_full(initial_state)  # we need make_full to that the state does
-    # not change type during iteration
+    state = make_full(initial_state)  # we need make_full so that the state does
+                                      # not change type during iteration
     # For type stability, we fake-run it. It's rather lame. Ideally, we'd build the
     # output type from the input types
     _, _, dum_predictive = kfilter(state, m, inputs, observations, 1)
