@@ -173,33 +173,40 @@ observation_mat(m, inputs, i) = Identity() #observation_mats(m, inputs)[i]
 ################################################################################
 ## Delegations
 
+full_initial_state(m) = make_full(initial_state(m))
+
 kfilter(prev_state::Gaussian, m::MiniKalman.Model, inp, t::Int, observations=nothing) = 
     kfilter(prev_state, transition_mat(m, inp, t),
             transition_noise(m, inp, t),
             observations===nothing ? MiniKalman.observation(inp, t) : observations[t],
             observation_mat(m, inp, t), observation_noise(m, inp, t))
 
-kalman_filter(m::Model, inputs0::EInputs, observations=nothing,
-              initial_state=MiniKalman.initial_state(m)) =
-    # Function barrier
-    kalman_filter_(m, eval_inputs(m, inputs0), observations, initial_state)
+function kalman_filter!(filtered_states::AbstractVector, predicted_obs::AbstractVector,
+                        lls::AbstractVector,
+                        m::Model, inputs::EInputs, observations,
+                        steps::Range=1:length(filtered_states),
+                        initial_state=(steps[1]==1 ? full_initial_state(m) :
+                                       filtered_states[steps[1]-1]))
+    state = initial_state
+    for t in steps
+        state, lls[t], predicted_obs[t] = kfilter(state, m, inputs, t, observations)
+        filtered_states[t] = state
+    end
+end
 
-function kalman_filter_(m::Model, inputs::EInputs, observations, initial_state)
+function kalman_filter(m::Model, inputs0::EInputs, observations=nothing,
+                       initial_state=initial_state(m))
+    inputs = eval_inputs(m, inputs0)
     state = make_full(initial_state)  # we need make_full so that the state does
                                       # not change type during iteration
     # For type stability, we fake-run it. It's rather lame. Ideally, we'd build the
     # output type from the input types
     _, _, dum_predictive = kfilter(state, m, inputs, 1, observations)
-    P = typeof(dum_predictive)
-    T = typeof(state)
-    filtered_states = Vector{T}(length(observations))
-    predicted_obs = Vector{P}(length(observations))
-    lls = Vector{Float64}(length(observations))
-
-    for t in 1:length(observations)
-        state, lls[t], predicted_obs[t] = kfilter(state, m, inputs, t, observations)
-        filtered_states[t] = state::T
-    end
+    filtered_states = Vector{typeof(state)}(length(inputs0))
+    predicted_obs = Vector{typeof(dum_predictive)}(length(inputs0))
+    lls = Vector{Float64}(length(inputs0))
+    kalman_filter!(filtered_states, predicted_obs, lls, m, inputs, observations,
+                   1:length(filtered_states), state)
     return filtered_states, lls, predicted_obs
 end
 
