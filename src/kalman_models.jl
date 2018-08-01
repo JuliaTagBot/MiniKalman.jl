@@ -199,7 +199,8 @@ function output_vectors(m::Model, einputs, observations)
     state = full_initial_state(m)
     # For type stability, we fake-run it. It's rather lame. Ideally, we'd build all
     # output types from the input types
-    _, _, dum_predictive = kfilter(state, m, einputs, 1, observations)
+    state2, _, dum_predictive = kfilter(state, m, einputs, 1, observations)
+    @assert typeof(state) == typeof(state2)
     filtered_states = Vector{typeof(state)}(length(einputs))
     predicted_obs = Vector{typeof(dum_predictive)}(length(einputs))
     lls = Vector{Float64}(length(einputs))
