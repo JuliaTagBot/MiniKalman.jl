@@ -41,7 +41,7 @@ kalman_quantities = [:observation_mat, :observation_mats,
                      :observation_noise, :observation_noises, 
                      :transition_mat, :transition_mats,
                      :transition_noise, :transition_noises,
-                     :initial_state, :labels]
+                     :initial_state, :observation, :labels]
 for q in kalman_quantities
     @eval function $q end  # forward declarations
 end
@@ -173,24 +173,23 @@ observation_mat(m, inputs, i) = Identity() #observation_mats(m, inputs)[i]
 ################################################################################
 ## Delegations
 
-kfilter(state_prior::Gaussian, model, inputs, observations, t::Int) =
-    kfilter(state_prior, transition_mat(model, inputs, t),
-            transition_noise(model, inputs, t),
-            observations[t],
-            observation_mat(model, inputs, t),
-            observation_noise(model, inputs, t))
+kfilter(prev_state::Gaussian, m::MiniKalman.Model, inp, t::Int, observations=nothing) = 
+    kfilter(prev_state, transition_mat(m, inp, t),
+            transition_noise(m, inp, t),
+            observations===nothing ? MiniKalman.observation(inp, t) : observations[t],
+            observation_mat(m, inp, t), observation_noise(m, inp, t))
 
-kalman_filter(m::Model, inputs0::EInputs, observations::AbstractVector,
+kalman_filter(m::Model, inputs0::EInputs, observations=nothing,
               initial_state=MiniKalman.initial_state(m)) =
+    # Function barrier
     kalman_filter_(m, eval_inputs(m, inputs0), observations, initial_state)
 
-function kalman_filter_(m::Model, inputs::EInputs, observations::AbstractVector,
-                        initial_state)
+function kalman_filter_(m::Model, inputs::EInputs, observations, initial_state)
     state = make_full(initial_state)  # we need make_full so that the state does
                                       # not change type during iteration
     # For type stability, we fake-run it. It's rather lame. Ideally, we'd build the
     # output type from the input types
-    _, _, dum_predictive = kfilter(state, m, inputs, observations, 1)
+    _, _, dum_predictive = kfilter(state, m, inputs, 1, observations)
     P = typeof(dum_predictive)
     T = typeof(state)
     filtered_states = Vector{T}(length(observations))
@@ -198,7 +197,7 @@ function kalman_filter_(m::Model, inputs::EInputs, observations::AbstractVector,
     lls = Vector{Float64}(length(observations))
 
     for t in 1:length(observations)
-        state, lls[t], predicted_obs[t] = kfilter(state, m, inputs, observations, t)
+        state, lls[t], predicted_obs[t] = kfilter(state, m, inputs, t, observations)
         filtered_states[t] = state::T
     end
     return filtered_states, lls, predicted_obs
@@ -212,7 +211,7 @@ function log_likelihood_(m::Model, inputs::EInputs, observations, initial_state)
     ll_sum = 0.0
     state = make_full(initial_state)
     for t in 1:length(observations)
-        state, ll, _ = kfilter(state, m, inputs, observations, t)
+        state, ll, _ = kfilter(state, m, inputs, t, observations)
         ll_sum += ll
     end
     return ll_sum
