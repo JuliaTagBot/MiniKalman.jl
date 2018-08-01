@@ -187,7 +187,7 @@ function kalman_filter!(filtered_states::AbstractVector, predicted_obs::Abstract
                         steps::Range=1:length(filtered_states),
                         initial_state=(steps[1]==1 ? full_initial_state(m) :
                                        filtered_states[steps[1]-1]))
-    state = initial_state
+    state = make_full(initial_state)
     for t in steps
         state, lls[t], predicted_obs[t] = kfilter(state, m, inputs, t, observations)
         filtered_states[t] = state
