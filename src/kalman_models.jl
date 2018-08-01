@@ -181,33 +181,38 @@ kfilter(prev_state::Gaussian, m::MiniKalman.Model, inp, t::Int, observations=not
             observations===nothing ? MiniKalman.observation(inp, t) : observations[t],
             observation_mat(m, inp, t), observation_noise(m, inp, t))
 
-function kalman_filter!(filtered_states::AbstractVector, predicted_obs::AbstractVector,
-                        lls::AbstractVector,
+function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
+                        predicted_obs::AbstractVector,
                         m::Model, inputs::EInputs, observations,
                         steps::Range=1:length(filtered_states),
                         initial_state=(steps[1]==1 ? full_initial_state(m) :
                                        filtered_states[steps[1]-1]))
-    state = make_full(initial_state)
+    state = make_full(initial_state)  # we need make_full so that the state does
+                                      # not change type during iteration
     for t in steps
         state, lls[t], predicted_obs[t] = kfilter(state, m, inputs, t, observations)
         filtered_states[t] = state
     end
 end
 
+function output_vectors(m::Model, einputs, observations)
+    state = full_initial_state(m)
+    # For type stability, we fake-run it. It's rather lame. Ideally, we'd build all
+    # output types from the input types
+    _, _, dum_predictive = kfilter(state, m, einputs, 1, observations)
+    filtered_states = Vector{typeof(state)}(length(einputs))
+    predicted_obs = Vector{typeof(dum_predictive)}(length(einputs))
+    lls = Vector{Float64}(length(einputs))
+    return (filtered_states, lls, predicted_obs)
+end
+
 function kalman_filter(m::Model, inputs0::EInputs, observations=nothing,
                        initial_state=initial_state(m))
     inputs = eval_inputs(m, inputs0)
-    state = make_full(initial_state)  # we need make_full so that the state does
-                                      # not change type during iteration
-    # For type stability, we fake-run it. It's rather lame. Ideally, we'd build the
-    # output type from the input types
-    _, _, dum_predictive = kfilter(state, m, inputs, 1, observations)
-    filtered_states = Vector{typeof(state)}(length(inputs0))
-    predicted_obs = Vector{typeof(dum_predictive)}(length(inputs0))
-    lls = Vector{Float64}(length(inputs0))
-    kalman_filter!(filtered_states, predicted_obs, lls, m, inputs, observations,
-                   1:length(filtered_states), state)
-    return filtered_states, lls, predicted_obs
+    out_vecs = output_vectors(m, inputs, observations)
+    kalman_filter!(out_vecs..., m, inputs, observations, 1:length(out_vecs[1]),
+                   initial_state)
+    return out_vecs
 end
 
 log_likelihood(m::Model, inputs0::EInputs, observations::AbstractVector,
