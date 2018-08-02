@@ -183,7 +183,7 @@ kfilter(prev_state::Gaussian, m::MiniKalman.Model, inp, t::Int, observations=not
 
 function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
                         predicted_obs::AbstractVector,
-                        m::Model, inputs::EInputs, observations,
+                        m::Model, inputs::EInputs, observations=nothing,
                         steps::Range=1:length(filtered_states),
                         initial_state=(steps[1]==1 ? full_initial_state(m) :
                                        filtered_states[steps[1]-1]))
@@ -195,7 +195,7 @@ function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
     end
 end
 
-function output_vectors(m::Model, einputs, observations)
+function output_vectors(m::Model, einputs, observations=nothing)
     state = full_initial_state(m)
     # For type stability, we fake-run it. It's rather lame. Ideally, we'd build all
     # output types from the input types
