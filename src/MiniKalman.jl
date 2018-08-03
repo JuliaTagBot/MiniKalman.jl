@@ -157,6 +157,8 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
     return filtered_states, lls, predicted_obs
 end
 
+kalman_filtered(args...) = kalman_filter(args...)[1]  # convenience
+
 function log_likelihood(initial_state_prior::Gaussian, observations::AbstractVector,
                         observation_noises::AbstractVector{<:Gaussian},
                         transition_mats::AbstractVector,

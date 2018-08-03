@@ -33,9 +33,11 @@ Base.length(inputs::DictInputs) = inputs.N
 
 ################################################################################
 
-marginal_std(g::Gaussian) = sqrt.(diag(cov(g)))
-marginal_std(g::Gaussian, i::Int) = sqrt(diag(cov(g))[i])
-marginal(g::Gaussian, i::Int) = Gaussian(mean(g)[i], marginal_std(g, i))
+marginal_var(g::Gaussian) = diag(cov(g))
+marginal_var(g::Gaussian, i::Int) = diag(cov(g))[i]
+marginal_std(args...) = sqrt(marginal_var(args...))
+marginal(g::Gaussian, i::Int) = Gaussian(mean(g)[i], marginal_var(g, i))
+is_marginal(g::Gaussian) = dim(g) == 1
 
 kalman_quantities = [:observation_mat, :observation_mats, 
                      :observation_noise, :observation_noises, 
@@ -281,24 +283,25 @@ function Optim.optimize(model0::Model, inputs::Inputs,
     return (best_model, o)
 end
 
-
-function plot_hidden_state!(p, time, estimates, i; true_state=nothing,
+function plot_hidden_state!(p, time, marginals; true_state=nothing,
                             label="estimate", kwargs...)
     P = Main.Plots
-    P.plot!(p, time, getindex.(mean.(estimates), i); label=label,
-            ribbon=marginal_std.(estimates, i), msa=0.5, xlabel="time", kwargs...)
+    @assert is_marginal(marginals[1]) "Must pass a marginal gaussian."
+    P.plot!(p, time, first.(mean.(marginals)); label=label,
+            ribbon=first.(sqrt.(cov.(marginals))), msa=0.5, xlabel="time", kwargs...)
     if true_state !== nothing
         P.plot!(p, time, getindex.(true_state, i); label="truth",
                 linestyle=:dash, color=:orange)
     end
     p
 end
-plot_hidden_state(a, b, c; kwargs...) =
-    plot_hidden_state!(Main.Plots.plot(), a, b, c; kwargs...)
+plot_hidden_state(a, b; kwargs...) =
+    plot_hidden_state!(Main.Plots.plot(), a, b; kwargs...)
 plot_hidden_state(time, estimates; true_state=nothing,
                   ylabels=["hidden_state[$i]" for i in 1:dim(estimates[1])],
                   kwargs...) =
-    Main.Plots.plot([plot_hidden_state(time, estimates, i; true_state=true_state,
+    Main.Plots.plot([plot_hidden_state(time, marginal(estimates, i);
+                                       true_state=true_state,
                                        ylabel=ylabels[i], kwargs...)
                      for i in 1:dim(estimates[1])]...)
 
