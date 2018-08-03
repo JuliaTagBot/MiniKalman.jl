@@ -35,7 +35,7 @@ Base.length(inputs::DictInputs) = inputs.N
 
 marginal_std(g::Gaussian) = sqrt.(diag(cov(g)))
 marginal_std(g::Gaussian, i::Int) = sqrt(diag(cov(g))[i])
-
+marginal(g::Gaussian, i::Int) = Gaussian(mean(g)[i], marginal_std(g, i))
 
 kalman_quantities = [:observation_mat, :observation_mats, 
                      :observation_noise, :observation_noises, 
@@ -336,9 +336,10 @@ given `inputs`, then call `optimize` on `true_model * fuzz_factor`."""
 function sample_and_recover(true_model::Model, inputs::Inputs, rng;
                             parameters_to_optimize=fieldnames(true_model),
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model, parameters_to_optimize)))),
+                            initial_state=initial_state(true_model),
                             start_model=nothing)
     einputs = eval_inputs(true_model, inputs)
-    state0 = initial_state(true_model)::Gaussian
+    state0 = initial_state::Gaussian
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
     true_state, obs = kalman_sample(true_model, einputs, rng, rand(rng, state0))
     if start_model === nothing
