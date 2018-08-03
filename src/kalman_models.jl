@@ -234,12 +234,24 @@ end
 
 map_i(f, m, inputs) = mappedarray(i->f(m, inputs, i), 1:length(inputs))
 
+function kalman_smoother!(smoothed_states, m::Model, inputs, filtered_states;
+                          steps=length(smoothed_states)-1:-1:1)
+    @assert steps[1] >= steps[end]
+    @assert inputs === eval_inputs(m, inputs)
+    for t in steps
+        smoothed_states[t] =
+              ksmoother(filtered_states[t], smoothed_states[t+1],
+                        transition_mat(m, inputs, t+1),
+                        transition_noise(m, inputs, t+1))
+    end
+end
+
 function kalman_smoother(m::Model, inputs0::EInputs,
                          filtered_states::AbstractVector{<:Gaussian})
     inputs = eval_inputs(m, inputs0)
-    kalman_smoother(filtered_states;
-                    transition_mats=map_i(transition_mat, m, inputs),
-                    transition_noises=map_i(transition_noise, m, inputs))
+    smoothed_states = fill(filtered_states[end], length(filtered_states))
+    kalman_smoother!(smoothed_states, m, inputs, filtered_states)
+    return smoothed_states
 end
 function kalman_smoother(m::Model, inputs0::EInputs, observations::AbstractVector,
                          initial_state=MiniKalman.initial_state(m))
