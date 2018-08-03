@@ -253,7 +253,7 @@ function kalman_smoother(m::Model, inputs0::EInputs,
     kalman_smoother!(smoothed_states, m, inputs, filtered_states)
     return smoothed_states
 end
-function kalman_smoother(m::Model, inputs0::EInputs, observations::AbstractVector,
+function kalman_smoother(m::Model, inputs0::EInputs, observations=nothing,
                          initial_state=MiniKalman.initial_state(m))
     inputs = eval_inputs(m, inputs0)
     kalman_smoother(m, inputs, kalman_filter(m, inputs, observations, initial_state)[1])
