@@ -256,7 +256,7 @@ end
 function kalman_smoother(m::Model, inputs0::EInputs, observations=nothing,
                          initial_state=MiniKalman.initial_state(m))
     inputs = eval_inputs(m, inputs0)
-    kalman_smoother(m, inputs, kalman_filter(m, inputs, observations, initial_state)[1])
+    kalman_smoother(m, inputs, kalman_filtered(m, inputs, observations, initial_state))
 end
 
 function kalman_sample(m::Model, inputs0::EInputs, rng::AbstractRNG,
