@@ -1,5 +1,5 @@
-using Base.Test
-using MiniKalman, GaussianDistributions, StaticArrays, FillArrays
+using Test
+using MiniKalman, GaussianDistributions, StaticArrays, FillArrays, Statistics, Random
 
 N = 100
 rng = MersenneTwister(1)
@@ -8,10 +8,10 @@ rng = MersenneTwister(1)
 xx = rand(rng, 1, 1,N)
 XX = hcat(ones(1,1,N), xx)
 XX_mat = [convert(SMatrix{1,2}, XX[:,:,i]) for i in 1:N]
-YY = 7*xx[:] + randn(rng, N)*sqrt(1)+15
+YY = 7*xx[:] + randn(rng, N) .* sqrt(1) .+ 15
 YY_vec = map(SVector, YY)
 
-xxf2, ll2 = kalman_filter(Gaussian([20., 20.0], eye(2)*1000), YY_vec,
+xxf2, ll2 = kalman_filter(Gaussian([20., 20.0], [1000.0 0; 0 1000.0]), YY_vec,
                           Fill(MiniKalman.white_noise1(10.0), N),
                           observation_mats=XX_mat)
 ll2

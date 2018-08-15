@@ -4,6 +4,7 @@ using GaussianDistributions, FillArrays
 using GaussianDistributions: dim, logpdf
 using MappedArrays
 using StaticArrays
+using Statistics, Random, LinearAlgebra
 
 export kfilter, kalman_filter, white_noise, white_noise1, white_noise2,
     kalman_smoother, kalman_sample, no_noise
@@ -22,6 +23,7 @@ Base.:*(x, ::Identity) = x
 Base.:*(g::Gaussian, ::Identity) = g  # disambiguation
 Base.:*(::Identity, g::Gaussian) = g  # disambiguation
 Base.transpose(::Identity) = Identity()
+Base.adjoint(::Identity) = Identity()
 
 struct Zero end
 Base.:+(x, ::Zero) = x
@@ -144,9 +146,9 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
                 observations[1], observation_mats[1], observation_noises[1])
     P = typeof(dum_predictive)
     T = typeof(state)
-    filtered_states = Vector{T}(length(observations))
-    predicted_obs = Vector{P}(length(observations))
-    lls = Vector{Float64}(length(observations))
+    filtered_states = Vector{T}(undef, length(observations))
+    predicted_obs = Vector{P}(undef, length(observations))
+    lls = Vector{Float64}(undef, length(observations))
 
     for t in 1:length(observations)
         state, lls[t], predicted_obs[t] =

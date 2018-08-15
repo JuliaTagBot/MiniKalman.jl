@@ -2,7 +2,7 @@
 
 using MacroTools
 using MacroTools: postwalk
-using Parameters
+using Parameters  # for @with_kw
 using Optim
 using QuickTypes
 using QuickTypes: roottypeof
@@ -186,7 +186,7 @@ kfilter(prev_state::Gaussian, m::MiniKalman.Model, inp, t::Int, observations=not
 function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
                         predicted_obs::AbstractVector,
                         m::Model, inputs::EInputs, observations=nothing,
-                        steps::Range=1:length(filtered_states),
+                        steps::AbstractRange=1:length(filtered_states),
                         initial_state=(steps[1]==1 ? full_initial_state(m) :
                                        filtered_states[steps[1]-1]))
     state = make_full(initial_state)  # we need make_full so that the state does
@@ -307,8 +307,8 @@ function plot_hidden_state!(p, time, marginals; true_state=nothing,
     end
     p
 end
-plot_hidden_state(a, b; kwargs...) =
-    plot_hidden_state!(Main.Plots.plot(), a, b; kwargs...)
+# plot_hidden_state(a, b; kwargs...) =
+#     plot_hidden_state!(Main.Plots.plot(), a, b; kwargs...)
 plot_hidden_state(time, estimates; true_state=nothing,
                   ylabels=["hidden_state[$i]" for i in 1:dim(estimates[1])],
                   kwargs...) =
