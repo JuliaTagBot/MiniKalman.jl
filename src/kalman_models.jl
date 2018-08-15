@@ -138,7 +138,7 @@ export reconstruct   # Parameters.jl#57
 
 """ Create a new model of the same type as `model`, but with the given `params`.
 This is meant to be used with Optim.jl. Inspired from sklearn's `set_params`. """
-function set_params(model::Model, params::AbstractVector, names=fieldnames(model))
+function set_params(model::Model, params::AbstractVector, names=fieldnames(typeof(model)))
     i = 1
     upd = Dict()
     for name in names
@@ -147,7 +147,7 @@ function set_params(model::Model, params::AbstractVector, names=fieldnames(model
         upd[name] = params[v isa Number ? i : (i:i+nvals-1)]
         i += nvals
     end
-    kwargs = map(fieldnames(model)) do f
+    kwargs = map(fieldnames(typeof(model))) do f
         f=>get(upd, f) do
             getfield(model, f)
         end
@@ -155,7 +155,7 @@ function set_params(model::Model, params::AbstractVector, names=fieldnames(model
     # Assumes that there's a pure-kwarg constructor of the object
     return roottypeof(model)(; kwargs...)
 end
-get_params(model::Model, names=fieldnames(model)) =
+get_params(model::Model, names=fieldnames(typeof(model))) =
     Float64[x for v in names for x in getfield(model, v)]
 
 
@@ -278,7 +278,7 @@ function Optim.optimize(model0::Model, inputs::Inputs,
                         observations::AbstractVector,
                         initial_state=MiniKalman.initial_state(model0),;
                         min=0.0, # 0.0 is a bit arbitrary...
-                        parameters_to_optimize=fieldnames(model0), 
+                        parameters_to_optimize=fieldnames(typeof(model0)), 
                         method=LBFGS(linesearch=Optim.LineSearches.BackTracking()),
                         kwargs...)
     vars = parameters_to_optimize
@@ -349,7 +349,7 @@ data generated from the model.
 Concretely, we sample observations and hidden state from `true_model` for the
 given `inputs`, then call `optimize` on `true_model * fuzz_factor`."""
 function sample_and_recover(true_model::Model, inputs::Inputs, rng;
-                            parameters_to_optimize=fieldnames(true_model),
+                            parameters_to_optimize=fieldnames(typeof(true_model),)
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model, parameters_to_optimize)))),
                             initial_state=initial_state(true_model),
                             start_model=nothing)
