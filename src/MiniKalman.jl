@@ -239,7 +239,7 @@ function kalman_sample(rng::AbstractRNG, initial_state,
             length(transition_noises) == length(observation_mats) ==
             length(observation_noises),
             "All passed vectors should be of the same length")
-    result = accumulate((initial_state, nothing), 1:_N) do v, t
+    result = accumulate(1:_N; init=(initial_state, nothing)) do v, t
         state, _ = v
         next_state = transition_mats[t] * state + rand(rng, transition_noises[t])
         return (next_state,

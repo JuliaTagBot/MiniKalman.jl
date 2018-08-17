@@ -203,9 +203,9 @@ function output_vectors(m::Model, einputs, observations=nothing)
     # output types from the input types
     state2, _, dum_predictive = kfilter(state, m, einputs, 1, observations)
     @assert typeof(state) == typeof(state2)
-    filtered_states = Vector{typeof(state)}(length(einputs))
-    predicted_obs = Vector{typeof(dum_predictive)}(length(einputs))
-    lls = Vector{Float64}(length(einputs))
+    filtered_states = Vector{typeof(state)}(undef, length(einputs))
+    predicted_obs = Vector{typeof(dum_predictive)}(undef, length(einputs))
+    lls = Vector{Float64}(undef, length(einputs))
     return (filtered_states, lls, predicted_obs)
 end
 
@@ -349,7 +349,7 @@ data generated from the model.
 Concretely, we sample observations and hidden state from `true_model` for the
 given `inputs`, then call `optimize` on `true_model * fuzz_factor`."""
 function sample_and_recover(true_model::Model, inputs::Inputs, rng;
-                            parameters_to_optimize=fieldnames(typeof(true_model),)
+                            parameters_to_optimize=fieldnames(typeof(true_model)),
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model, parameters_to_optimize)))),
                             initial_state=initial_state(true_model),
                             start_model=nothing)
