@@ -1,7 +1,7 @@
 name = "MiniKalman"
 uuid = "978abd98-8827-1819-9a83-795297a8b9aa"
 author = ["Cedric St-Jean <cedric.st-jean@r2.ca"]
-version = "0.0.0"
+version = "0.0.7"
 
 [deps]
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
