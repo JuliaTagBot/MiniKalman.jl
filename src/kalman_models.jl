@@ -180,7 +180,7 @@ full_initial_state(m) = make_full(initial_state(m))
 kfilter(prev_state::Gaussian, m::MiniKalman.Model, inp, t::Int, observations=nothing) = 
     kfilter(prev_state, transition_mat(m, inp, t),
             transition_noise(m, inp, t),
-            observations===nothing ? MiniKalman.observation(inp, t) : observations[t],
+            observations===nothing ? observation(inp, t) : observations[t],
             observation_mat(m, inp, t), observation_noise(m, inp, t))
 
 function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
