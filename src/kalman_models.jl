@@ -134,7 +134,6 @@ macro kalman_model(def)
         $model_type
     end)
 end
-export reconstruct   # Parameters.jl#57
 
 """ Create a new model of the same type as `model`, but with the given `params`.
 This is meant to be used with Optim.jl. Inspired from sklearn's `set_params`. """
