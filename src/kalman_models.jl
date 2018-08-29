@@ -217,14 +217,14 @@ function kalman_filter(m::Model, inputs0::EInputs, observations=nothing,
     return out_vecs
 end
 
-log_likelihood(m::Model, inputs0::EInputs, observations::AbstractVector,
+log_likelihood(m::Model, inputs0::EInputs, observations,
                initial_state=MiniKalman.initial_state(m)) =
     log_likelihood_(m, eval_inputs(m, inputs0), observations, initial_state)
 
 function log_likelihood_(m::Model, inputs::EInputs, observations, initial_state)
     ll_sum = 0.0
     state = make_full(initial_state)
-    for t in 1:length(observations)
+    for t in 1:length(inputs)
         state, ll, _ = kfilter(state, m, inputs, t, observations)
         ll_sum += ll
     end
