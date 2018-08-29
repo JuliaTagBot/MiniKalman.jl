@@ -7,7 +7,7 @@ using StaticArrays
 using Statistics, Random, LinearAlgebra
 
 export kfilter, kalman_filter, white_noise, white_noise1, white_noise2,
-    kalman_smoother, kalman_sample, no_noise
+    kalman_smoother, kalman_sample, no_noise, log_likelihood
 
 ################################################################################
 # Algebraic identities
