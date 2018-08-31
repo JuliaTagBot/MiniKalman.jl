@@ -217,7 +217,7 @@ function kalman_filter(m::Model, inputs0::EInputs, observations=nothing,
     return out_vecs
 end
 
-log_likelihood(m::Model, inputs0::EInputs, observations,
+log_likelihood(m::Model, inputs0::EInputs, observations=nothing,
                initial_state=MiniKalman.initial_state(m)) =
     log_likelihood_(m, eval_inputs(m, inputs0), observations, initial_state)
 
