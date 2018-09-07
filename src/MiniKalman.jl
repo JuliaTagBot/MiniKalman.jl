@@ -31,6 +31,7 @@ Base.:+(::Zero, x) = x
 Base.:*(x, ::Zero) = zero(x)
 Base.:*(::Zero, x) = zero(x)
 Base.transpose(z::Zero) = z
+Base.adjoint(z::Zero) = z
 
 ################################################################################
 
