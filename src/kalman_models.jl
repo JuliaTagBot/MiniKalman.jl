@@ -10,6 +10,8 @@ import GaussianDistributions
 
 export @kalman_model, sample_and_recover, optimize
 
+function eval_inputs end  # DELETEME
+
 abstract type Model end
 
 ################################################################################
@@ -57,8 +59,6 @@ end
 #     @eval $q(::Model, ei::EvaluatedInputs) = $q(ei)
 #     @eval $q(ei::EvaluatedInputs) = ei.$q
 # end
-
-eval_inputs(_, inp) = inp  # default - preprocessing
 
 singular_qty_defaults = quote
     transition_mat = $MiniKalman.Identity()
@@ -206,20 +206,16 @@ function output_vectors(m::Model, einputs, observations=nothing)
     return (filtered_states, lls, predicted_obs)
 end
 
-function kalman_filter(m::Model, inputs0::Inputs, observations=nothing,
+function kalman_filter(m::Model, inputs::Inputs, observations=nothing,
                        initial_state=initial_state(m))
-    inputs = eval_inputs(m, inputs0)
     out_vecs = output_vectors(m, inputs, observations)
     kalman_filter!(out_vecs..., m, inputs, observations, 1:length(out_vecs[1]),
                    initial_state)
     return out_vecs
 end
 
-log_likelihood(m::Model, inputs0::Inputs, observations=nothing,
-               initial_state=MiniKalman.initial_state(m)) =
-    log_likelihood_(m, eval_inputs(m, inputs0), observations, initial_state)
-
-function log_likelihood_(m::Model, inputs::Inputs, observations, initial_state)
+function log_likelihood(m::Model, inputs::Inputs, observations=nothing,
+                        initial_state=MiniKalman.initial_state(m))
     ll_sum = 0.0
     state = make_full(initial_state)
     for t in 1:length(inputs)
@@ -234,7 +230,6 @@ map_i(f, m, inputs) = mappedarray(i->f(m, inputs, i), 1:length(inputs))
 function kalman_smoother!(smoothed_states, m::Model, inputs, filtered_states;
                           steps=length(smoothed_states)-1:-1:1)
     @assert steps[1] >= steps[end]
-    @assert inputs === eval_inputs(m, inputs)
     for t in steps
         smoothed_states[t] =
               ksmoother(filtered_states[t], smoothed_states[t+1],
@@ -243,22 +238,18 @@ function kalman_smoother!(smoothed_states, m::Model, inputs, filtered_states;
     end
 end
 
-function kalman_smoother(m::Model, inputs0::Inputs,
+function kalman_smoother(m::Model, inputs::Inputs,
                          filtered_states::AbstractVector{<:Gaussian})
-    inputs = eval_inputs(m, inputs0)
     smoothed_states = fill(filtered_states[end], length(filtered_states))
     kalman_smoother!(smoothed_states, m, inputs, filtered_states)
     return smoothed_states
 end
-function kalman_smoother(m::Model, inputs0::Inputs, observations=nothing,
-                         initial_state=MiniKalman.initial_state(m))
-    inputs = eval_inputs(m, inputs0)
+kalman_smoother(m::Model, inputs::Inputs, observations=nothing,
+                initial_state=MiniKalman.initial_state(m)) =
     kalman_smoother(m, inputs, kalman_filtered(m, inputs, observations, initial_state))
-end
 
-function kalman_sample(m::Model, inputs0::Inputs, rng::AbstractRNG,
+function kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG,
                        initial_state=MiniKalman.initial_state(m))
-    inputs = eval_inputs(m, inputs0)
     kalman_sample(rng, initial_state,
                   map_i(observation_noise, m, inputs);
                   transition_mats=map_i(transition_mat, m, inputs),
@@ -350,10 +341,9 @@ function sample_and_recover(true_model::Model, inputs::Inputs, rng;
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model, parameters_to_optimize)))),
                             initial_state=initial_state(true_model),
                             start_model=nothing)
-    einputs = eval_inputs(true_model, inputs)
     state0 = initial_state::Gaussian
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
-    true_state, obs = kalman_sample(true_model, einputs, rng, rand(rng, state0))
+    true_state, obs = kalman_sample(true_model, inputs, rng, rand(rng, state0))
     if start_model === nothing
         start_model = set_params(true_model,
                                  (get_params(true_model, parameters_to_optimize) .*
