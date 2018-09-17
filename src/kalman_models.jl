@@ -10,8 +10,6 @@ import GaussianDistributions
 
 export @kalman_model, sample_and_recover, optimize
 
-function eval_inputs end  # DELETEME
-
 abstract type Model end
 
 ################################################################################
@@ -263,8 +261,8 @@ end
 """ Finds a set of model parameters that attempts to maximize the log-likelihood
 on the given dataset. Returns `(best_model, optim_object)`. """
 function Optim.optimize(model0::Model, inputs::Inputs,
-                        observations::AbstractVector,
-                        initial_state=MiniKalman.initial_state(model0),;
+                        observations::Union{Nothing, AbstractVector}=nothing;
+                        initial_state=MiniKalman.initial_state(model0),
                         min=0.0, # 0.0 is a bit arbitrary...
                         parameters_to_optimize=fieldnames(typeof(model0)), 
                         method=LBFGS(linesearch=Optim.LineSearches.BackTracking()),
@@ -339,20 +337,20 @@ given `inputs`, then call `optimize` on `true_model * fuzz_factor`."""
 function sample_and_recover(true_model::Model, inputs::Inputs, rng;
                             parameters_to_optimize=fieldnames(typeof(true_model)),
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model, parameters_to_optimize)))),
-                            initial_state=initial_state(true_model),
+                            initial_state::Gaussian=initial_state(true_model),
                             start_model=nothing)
-    state0 = initial_state::Gaussian
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
-    true_state, obs = kalman_sample(true_model, inputs, rng, rand(rng, state0))
+    true_state, obs = kalman_sample(true_model, inputs, rng, rand(rng, initial_state))
     if start_model === nothing
         start_model = set_params(true_model,
                                  (get_params(true_model, parameters_to_optimize) .*
                                   fuzz_factor),
                                  parameters_to_optimize)
     end
-    (best_model, o) = optimize(start_model, inputs, obs, state0;
+    (best_model, o) = optimize(start_model, inputs, obs;
+                               initial_state=initial_state,
                                parameters_to_optimize=parameters_to_optimize)
-    estimated_state = kalman_smoother(best_model, inputs, obs, state0)
+    estimated_state = kalman_smoother(best_model, inputs, obs, initial_state)
     return RecoveryResults(true_model, best_model, true_state, estimated_state, obs, o)
 end
 
