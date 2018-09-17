@@ -48,12 +48,10 @@ for q in kalman_quantities
     @eval function $q end  # forward declarations
 end
 
-const EInputs = Inputs
-
 # @qstruct_fp EvaluatedInputs(observation_mats, observation_noises, transition_mats,
 #                             transition_noises, initial_state)
 # Base.length(ei::EvaluatedInputs) = length(ei.observation_mats)
-# const EInputs = Union{Inputs, EvaluatedInputs}
+# const Inputs = Union{Inputs, EvaluatedInputs}
 # eval_inputs(::Model, ei::EvaluatedInputs) = ei
 # for q in fieldnames(EvaluatedInputs)
 #     @eval $q(::Model, ei::EvaluatedInputs) = $q(ei)
@@ -184,7 +182,7 @@ kfilter(prev_state::Gaussian, m::MiniKalman.Model, inp, t::Int, observations=not
 
 function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
                         predicted_obs::AbstractVector,
-                        m::Model, inputs::EInputs, observations=nothing,
+                        m::Model, inputs::Inputs, observations=nothing,
                         steps::AbstractRange=1:length(filtered_states),
                         initial_state=(steps[1]==1 ? full_initial_state(m) :
                                        filtered_states[steps[1]-1]))
@@ -208,7 +206,7 @@ function output_vectors(m::Model, einputs, observations=nothing)
     return (filtered_states, lls, predicted_obs)
 end
 
-function kalman_filter(m::Model, inputs0::EInputs, observations=nothing,
+function kalman_filter(m::Model, inputs0::Inputs, observations=nothing,
                        initial_state=initial_state(m))
     inputs = eval_inputs(m, inputs0)
     out_vecs = output_vectors(m, inputs, observations)
@@ -217,11 +215,11 @@ function kalman_filter(m::Model, inputs0::EInputs, observations=nothing,
     return out_vecs
 end
 
-log_likelihood(m::Model, inputs0::EInputs, observations=nothing,
+log_likelihood(m::Model, inputs0::Inputs, observations=nothing,
                initial_state=MiniKalman.initial_state(m)) =
     log_likelihood_(m, eval_inputs(m, inputs0), observations, initial_state)
 
-function log_likelihood_(m::Model, inputs::EInputs, observations, initial_state)
+function log_likelihood_(m::Model, inputs::Inputs, observations, initial_state)
     ll_sum = 0.0
     state = make_full(initial_state)
     for t in 1:length(inputs)
@@ -245,20 +243,20 @@ function kalman_smoother!(smoothed_states, m::Model, inputs, filtered_states;
     end
 end
 
-function kalman_smoother(m::Model, inputs0::EInputs,
+function kalman_smoother(m::Model, inputs0::Inputs,
                          filtered_states::AbstractVector{<:Gaussian})
     inputs = eval_inputs(m, inputs0)
     smoothed_states = fill(filtered_states[end], length(filtered_states))
     kalman_smoother!(smoothed_states, m, inputs, filtered_states)
     return smoothed_states
 end
-function kalman_smoother(m::Model, inputs0::EInputs, observations=nothing,
+function kalman_smoother(m::Model, inputs0::Inputs, observations=nothing,
                          initial_state=MiniKalman.initial_state(m))
     inputs = eval_inputs(m, inputs0)
     kalman_smoother(m, inputs, kalman_filtered(m, inputs, observations, initial_state))
 end
 
-function kalman_sample(m::Model, inputs0::EInputs, rng::AbstractRNG,
+function kalman_sample(m::Model, inputs0::Inputs, rng::AbstractRNG,
                        initial_state=MiniKalman.initial_state(m))
     inputs = eval_inputs(m, inputs0)
     kalman_sample(rng, initial_state,
