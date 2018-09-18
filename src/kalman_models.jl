@@ -267,17 +267,16 @@ function Optim.optimize(model0::Model, inputs::Inputs,
                         parameters_to_optimize=fieldnames(typeof(model0)), 
                         method=LBFGS(linesearch=Optim.LineSearches.BackTracking()),
                         kwargs...)
-    vars = parameters_to_optimize
-    initial_x = get_params(model0, vars)
+    initial_x = get_params(model0, parameters_to_optimize)
     function objective(params)
-        model = set_params(model0, params, vars)
+        model = set_params(model0, params, parameters_to_optimize)
         return -log_likelihood(model, inputs, observations, initial_state)
     end
     td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
     mins = min isa AbstractVector ? min : fill(min, length(initial_x))
     maxes = fill(Inf, length(initial_x))
     o = optimize(td, mins, maxes, initial_x, Fminbox(method), Optim.Options(; kwargs...))
-    best_model = set_params(model0, Optim.minimizer(o), vars)
+    best_model = set_params(model0, Optim.minimizer(o), parameters_to_optimize)
     return (best_model, o)
 end
 
