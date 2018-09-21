@@ -160,7 +160,7 @@ function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVect
     return filtered_states, lls, predicted_obs
 end
 
-kalman_filtered(args...) = kalman_filter(args...)[1]  # convenience
+kalman_filtered(args...; kwargs...) = kalman_filter(args...; kwargs...)[1]  # convenience
 
 function log_likelihood(initial_state_prior::Gaussian, observations::AbstractVector,
                         observation_noises::AbstractVector{<:Gaussian},
@@ -229,7 +229,7 @@ end
 Base.rand(RNG, P::Gaussian{U, Zero}) where U = P.μ
 
 """ Returns `(hidden_state::Vector, observations::Vector)` """
-function kalman_sample(rng::AbstractRNG, initial_state,
+function kalman_sample(rng::AbstractRNG, start_state,
                        observation_noises::AbstractVector{<:Gaussian};
                        _N=length(observation_noises), # to help create defaults
                        transition_mats::AbstractVector=Fill(Identity(), _N),
@@ -240,7 +240,7 @@ function kalman_sample(rng::AbstractRNG, initial_state,
             length(transition_noises) == length(observation_mats) ==
             length(observation_noises),
             "All passed vectors should be of the same length")
-    result = accumulate(1:_N; init=(initial_state, nothing)) do v, t
+    result = accumulate(1:_N; init=(start_state, nothing)) do v, t
         state, _ = v
         next_state = transition_mats[t] * state + rand(rng, transition_noises[t])
         return (next_state,

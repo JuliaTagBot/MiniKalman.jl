@@ -180,7 +180,7 @@ kfilter(prev_state::Gaussian, m::MiniKalman.Model, inp, t::Int, observations=not
 
 function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
                         predicted_obs::AbstractVector,
-                        m::Model, inputs::Inputs, observations=nothing,
+                        m::Model, inputs::Inputs, observations=nothing;
                         steps::AbstractRange=1:length(filtered_states),
                         initial_state=(steps[1]==1 ? full_initial_state(m) :
                                        filtered_states[steps[1]-1]))
@@ -209,11 +209,12 @@ function kalman_filter(m::Model, inputs::Inputs, observations=nothing;
                        initial_state=initial_state(m), steps=1:length(inputs))
     N = length(steps)
     out_vecs = output_vectors(m, inputs, observations, length=N)
-    kalman_filter!(out_vecs..., m, inputs, observations, steps, initial_state)
+    kalman_filter!(out_vecs..., m, inputs, observations; steps=steps,
+                   initial_state=initial_state)
     return out_vecs
 end
 
-function log_likelihood(m::Model, inputs::Inputs, observations=nothing,
+function log_likelihood(m::Model, inputs::Inputs, observations=nothing;
                         initial_state=MiniKalman.initial_state(m))
     ll_sum = 0.0
     state = make_full(initial_state)
@@ -243,13 +244,14 @@ function kalman_smoother(m::Model, inputs::Inputs,
     kalman_smoother!(smoothed_states, m, inputs, filtered_states)
     return smoothed_states
 end
-kalman_smoother(m::Model, inputs::Inputs, observations=nothing,
+kalman_smoother(m::Model, inputs::Inputs, observations=nothing;
                 initial_state=MiniKalman.initial_state(m)) =
-    kalman_smoother(m, inputs, kalman_filtered(m, inputs, observations, initial_state))
+    kalman_smoother(m, inputs, kalman_filtered(m, inputs, observations;
+                                               initial_state=initial_state))
 
 function kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG,
-                       initial_state=MiniKalman.initial_state(m))
-    kalman_sample(rng, initial_state,
+                       start_state)
+    kalman_sample(rng, start_state,
                   map_i(observation_noise, m, inputs);
                   transition_mats=map_i(transition_mat, m, inputs),
                   transition_noises=map_i(transition_noise, m, inputs),
@@ -271,7 +273,7 @@ function Optim.optimize(model0::Model, inputs::Inputs,
     initial_x = get_params(model0, parameters_to_optimize)
     function objective(params)
         model = set_params(model0, params, parameters_to_optimize)
-        return -log_likelihood(model, inputs, observations, initial_state)
+        return -log_likelihood(model, inputs, observations; initial_state=initial_state)
     end
     td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
     mins = min isa AbstractVector ? min : fill(min, length(initial_x))
@@ -350,7 +352,8 @@ function sample_and_recover(true_model::Model, inputs::Inputs, rng;
     (best_model, o) = optimize(start_model, inputs, obs;
                                initial_state=initial_state,
                                parameters_to_optimize=parameters_to_optimize)
-    estimated_state = kalman_smoother(best_model, inputs, obs, initial_state)
+    estimated_state = kalman_smoother(best_model, inputs, obs,
+                                      initial_state=initial_state)
     return RecoveryResults(true_model, best_model, true_state, estimated_state, obs, o)
 end
 
