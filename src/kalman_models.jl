@@ -192,23 +192,24 @@ function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
     end
 end
 
-function output_vectors(m::Model, einputs, observations=nothing)
-    state = full_initial_state(m)
+function output_vectors(m::Model, einputs, observations=nothing; length=length(einputs),
+                        initial_state=initial_state(m))
+    state = make_full(initial_state)
     # For type stability, we fake-run it. It's rather lame. Ideally, we'd build all
     # output types from the input types
     state2, _, dum_predictive = kfilter(state, m, einputs, 1, observations)
     @assert typeof(state) == typeof(state2)
-    filtered_states = Vector{typeof(state)}(undef, length(einputs))
-    predicted_obs = Vector{typeof(dum_predictive)}(undef, length(einputs))
-    lls = Vector{Float64}(undef, length(einputs))
+    filtered_states = Vector{typeof(state)}(undef, length)
+    predicted_obs = Vector{typeof(dum_predictive)}(undef, length)
+    lls = Vector{Float64}(undef, length)
     return (filtered_states, lls, predicted_obs)
 end
 
-function kalman_filter(m::Model, inputs::Inputs, observations=nothing,
-                       initial_state=initial_state(m))
-    out_vecs = output_vectors(m, inputs, observations)
-    kalman_filter!(out_vecs..., m, inputs, observations, 1:length(out_vecs[1]),
-                   initial_state)
+function kalman_filter(m::Model, inputs::Inputs, observations=nothing;
+                       initial_state=initial_state(m), steps=1:length(inputs))
+    N = length(steps)
+    out_vecs = output_vectors(m, inputs, observations, length=N)
+    kalman_filter!(out_vecs..., m, inputs, observations, steps, initial_state)
     return out_vecs
 end
 
