@@ -7,7 +7,7 @@ using StaticArrays
 using Statistics, Random, LinearAlgebra
 
 export kfilter, kalman_filter, white_noise, white_noise1, white_noise2,
-    kalman_smoother, kalman_sample, no_noise, log_likelihood
+    kalman_smoother, kalman_sample, no_noise, log_likelihood, cumulative_log_likelihood
 
 ################################################################################
 # Algebraic identities
@@ -178,7 +178,9 @@ function log_likelihood(initial_state_prior::Gaussian, observations::AbstractVec
     end
     return ll_sum
 end    
-
+""" Convenience; returns a vector of the total likelihood up to each step. """
+cumulative_log_likelihood(args...; kwargs...) =
+    cumsum(kalman_filter(args...; kwargs...)[2])
 """ Compute the smoothed belief state at step `t`, given the `t+1`'th smoothed belief
 state. """
 function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
