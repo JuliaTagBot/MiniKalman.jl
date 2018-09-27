@@ -8,7 +8,7 @@ using QuickTypes
 using QuickTypes: roottypeof
 import GaussianDistributions
 
-export @kalman_model, sample_and_recover, optimize
+export @kalman_model, sample_and_recover, optimize, marginal
 
 abstract type Model end
 
