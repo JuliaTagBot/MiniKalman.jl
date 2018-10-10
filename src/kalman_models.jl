@@ -288,7 +288,7 @@ function plot_hidden_state!(p, time, marginals; true_state=nothing,
     P = Main.Plots
     @assert is_marginal(marginals[1]) "Must pass a marginal gaussian."
     P.plot!(p, time, first.(mean.(marginals)); label=label,
-            ribbon=first.(sqrt.(cov.(marginals))), msa=0.5, xlabel="time", kwargs...)
+            ribbon=first.(sqrt.(cov.(marginals))), msa=0.5, kwargs...)
     if true_state !== nothing
         P.plot!(p, time, getindex.(true_state, i); label="truth",
                 linestyle=:dash, color=:orange)
