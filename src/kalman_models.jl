@@ -151,7 +151,7 @@ function set_params(model::Model, params::AbstractVector, names=fieldnames(typeo
     return roottypeof(model)(; kwargs...)
 end
 get_params(model::Model, names=fieldnames(typeof(model))) =
-    Float64[x for v in names for x in getfield(model, v)]
+    [x for v in names for x in getfield(model, v)]
 
 
 ################################################################################
