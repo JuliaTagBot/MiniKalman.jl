@@ -37,10 +37,13 @@ Base.adjoint(z::Zero) = z
 
 no_noise() = Gaussian(Zero(), Zero())
 white_noise2(sigma2s...) =
-    Gaussian(zero(SVector{length(sigma2s), Float64}), SDiagonal(sigma2s))
+    Gaussian(zero(SVector{length(sigma2s), typeof(zero(sqrt(sigma2s[1])))}),
+             SDiagonal(sigma2s))
 # fast special-cases
-white_noise2(a) = Gaussian(SVector(0.0), SMatrix{1,1}(a)) 
-white_noise2(a, b) = Gaussian(SVector(0.0, 0.0), SDiagonal(a, b))
+white_noise2(a) =
+    # sqrt(zero(a)) is non-differentiable, but zero(sqrt(a)) is.
+    Gaussian(SVector(zero(sqrt(a))), SMatrix{1,1}(a))
+white_noise2(a, b) = Gaussian(SVector(zero(sqrt(a)), zero(sqrt(b))), SDiagonal(a, b))
 # TODO: eventually have white_noise = white_noise1 and maybe stop exporting white_noise2
 # since it's counter-intuitive, and deprecate white_noise1.
 # We've been white_noise-free since June 7th.
