@@ -1,5 +1,6 @@
 using Test
-using MiniKalman, GaussianDistributions, StaticArrays, FillArrays, Statistics, Random
+using MiniKalman, GaussianDistributions, StaticArrays, FillArrays, Statistics, Random,
+    Unitful
 
 N = 100
 rng = MersenneTwister(1)
@@ -22,4 +23,4 @@ xf = mean(xxf2[end])
 @test xf ≈ [15.0589, 6.73069] rtol=0.001
 
 @test sum(ll2) ≈ -328.39288090529027
-
+rand(white_noise2(1.0u"m^2"))

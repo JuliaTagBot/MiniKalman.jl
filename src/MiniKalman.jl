@@ -49,6 +49,9 @@ white_noise2(a, b) = Gaussian(SVector(zero(sqrt(a)), zero(sqrt(b))), SDiagonal(a
 # We've been white_noise-free since June 7th.
 white_noise1(args...) = white_noise2((args.^2)...)
 white_noise(args...) = white_noise1(args...)
+Random.rand(RNG::AbstractRNG, g::Gaussian{<:SVector{1}}) =  # type piracy!
+    # otherwise calls Cholesky, which fails with unitful Gaussians
+    SVector(rand(RNG, Gaussian(mean(g)[1], cov(g)[1])))
 
 parameters(g::Gaussian) = (mean(g), cov(g))   # convenience
 
