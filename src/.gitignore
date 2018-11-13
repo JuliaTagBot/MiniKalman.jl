@@ -2,5 +2,7 @@
 /filtering.jl~
 /identities.jl~
 /kalman_models.jl~
+/optim.jl~
+/sampling.jl~
 /smoothing.jl~
 /utils.jl~

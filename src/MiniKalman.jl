@@ -4,13 +4,18 @@ using GaussianDistributions, FillArrays
 using GaussianDistributions: dim, logpdf
 using StaticArrays
 using Statistics, Random, LinearAlgebra
+using Unitful: ustrip, unit   # could be @required ?
+using QuickTypes: roottypeof  # TODO: get rid of dependency
 
 export kfilter, kalman_filter, white_noise1, white_noise2,
-    kalman_smoother, kalman_sample, no_noise, log_likelihood, cumulative_log_likelihood
+    kalman_smoother, kalman_sample, no_noise, log_likelihood, cumulative_log_likelihood,
+    sample_and_recover, optimize, marginal
+
 
 include("utils.jl")
 include("filtering.jl")
 include("smoothing.jl")
-include("kalman_models.jl")
+include("optim.jl")
+include("sampling.jl")
 
 end  # module

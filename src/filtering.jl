@@ -12,28 +12,6 @@ end
 Parameters.jl) """
 abstract type Model end
 
-get_params(model::Model, names=fieldnames(typeof(model))) =
-    [x for v in names for x in getfield(model, v)]
-""" Create a new model of the same type as `model`, but with the given `params`.
-This is meant to be used with Optim.jl. Inspired from sklearn's `set_params`. """
-function set_params(model::Model, params::AbstractVector, names=fieldnames(typeof(model)))
-    # Not efficient, but doesn't really have to be for significant input length.
-    i = 1
-    upd = Dict()
-    for name in names
-        v = getfield(model, name)
-        nvals = length(v)
-        upd[name] = params[v isa Number ? i : (i:i+nvals-1)]
-        i += nvals
-    end
-    kwargs = map(fieldnames(typeof(model))) do f
-        f=>get(upd, f) do
-            getfield(model, f)
-        end
-    end
-    return roottypeof(model)(; kwargs...)
-end
-
 # Defaults
 transition_mat(m, inputs, i) = Identity()
 transition_noise(m, inputs, i) = Zero()

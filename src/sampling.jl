@@ -1,25 +1,5 @@
-# This code is 100% built _on top_ of MiniKalman.jl
-
-using Unitful: ustrip, unit   # could be @required ?
-using Optim
-using QuickTypes: roottypeof  # TODO: get rid of dependency
-
-export @kalman_model, sample_and_recover, optimize, marginal
-
-
-################################################################################
-marginal_var(g::Gaussian) = diag(cov(g))
-marginal_var(g::Gaussian, i::Int) = diag(cov(g))[i]
-marginal_std(args...) = sqrt(marginal_var(args...))
-marginal(g::Gaussian, i::Int) = Gaussian(mean(g)[i], marginal_var(g, i))
-is_marginal(g::Gaussian) = dim(g) == 1
-
-
-
-################################################################################
-
-full_initial_state(m) = make_full(initial_state(m))
-
+# This is essentially the definition of sampling from a dirac delta. 
+Base.rand(RNG, P::Gaussian{U, Zero}) where U = P.μ
 
 function kalman_sample(m::Model, inputs, rng::AbstractRNG, start_state, N=length(inputs))
     # This code was optimized in 0.6, but sampling doesn't usually have to be
@@ -36,32 +16,7 @@ function kalman_sample(m::Model, inputs, rng::AbstractRNG, start_state, N=length
 end
 
 ################################################################################
-# Optimization
-
-split_units(vec::Vector) = ustrip.(vec), unit.(vec)
-
-""" Finds a set of model parameters that attempts to maximize the log-likelihood
-on the given dataset. Returns `(best_model, optim_object)`. """
-function Optim.optimize(model0::Model, inputs,
-                        observations::Union{Nothing, AbstractVector}=nothing;
-                        initial_state=MiniKalman.initial_state(model0),
-                        min=0.0, # 0.0 is a bit arbitrary...
-                        parameters_to_optimize=fieldnames(typeof(model0)), 
-                        method=LBFGS(linesearch=Optim.LineSearches.BackTracking()),
-                        kwargs...)
-    # It would be nice not to need split_units
-    initial_x, units = split_units(get_params(model0, parameters_to_optimize))
-    function objective(params)
-        model = set_params(model0, params .* units, parameters_to_optimize)
-        return -log_likelihood(model, inputs, observations; initial_state=initial_state)
-    end
-    td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
-    mins = min isa AbstractVector ? min : fill(min, length(initial_x))
-    maxes = fill(Inf, length(initial_x))
-    o = optimize(td, mins, maxes, initial_x, Fminbox(method), Optim.Options(; kwargs...))
-    best_model = set_params(model0, Optim.minimizer(o) .* units, parameters_to_optimize)
-    return (best_model, o)
-end
+# sample_and_recover
 
 struct RecoveryResults
     true_model
@@ -86,12 +41,6 @@ function Base.show(io::IO, ::MIME"text/html", rr::RecoveryResults)
     #      plot_hidden_state(1:length(rr.obs), rr.estimated_state;
     #                        true_state=rr.true_state))
 end
-
-################################################################################
-# Sampling
-
-# This is essentially the definition of sampling from a dirac delta. 
-Base.rand(RNG, P::Gaussian{U, Zero}) where U = P.μ
 
 """ See if we can recover the model parameters _and_ the true parameters using
 data generated from the model.
@@ -118,4 +67,3 @@ function sample_and_recover(true_model::Model, inputs, rng;
                                       initial_state=initial_state)
     return RecoveryResults(true_model, best_model, true_state, estimated_state, obs, o)
 end
-

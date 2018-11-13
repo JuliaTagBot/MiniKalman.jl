@@ -66,3 +66,12 @@ parameters(g::Gaussian) = (mean(g), cov(g))   # convenience
 # See definitions in Base.
 Base.:\(A::StaticArrays.SArray{Tuple{1,1},<:Any,2,1},
         B::StaticArrays.SArray) = B ./ A[1]
+
+################################################################################
+# Marginal variance and standard-deviation
+
+marginal_var(g::Gaussian) = diag(cov(g))
+marginal_var(g::Gaussian, i::Int) = diag(cov(g))[i]
+marginal_std(args...) = sqrt(marginal_var(args...))
+marginal(g::Gaussian, i::Int) = Gaussian(mean(g)[i], marginal_var(g, i))
+is_marginal(g::Gaussian) = dim(g) == 1  # a bit wonky
