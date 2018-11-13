@@ -104,7 +104,8 @@ function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
 end
 
 function kalman_filter(m::Model, inputs, observations=nothing;
-                       initial_state=initial_state(m), steps=1:length(inputs))
+                       initial_state=initial_state(m),
+                       steps=1:length(observations===nothing ? inputs : observations))
     out_vecs = output_vectors(m, inputs, observations, length=length(steps))
     kalman_filter!(out_vecs..., m, inputs, observations; steps=steps,
                    initial_state=initial_state)

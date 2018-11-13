@@ -31,12 +31,11 @@ parameter_accuracy_ratios(rr::RecoveryResults) =
     [f=>getfield(rr.estimated_model, f) ./ getfield(rr.true_model, f)
      for f in fieldnames(typeof(rr.estimated_model))]
 
-function Base.show(io::IO, ::MIME"text/html", rr::RecoveryResults)
-    print(io, "Ratio of estimated/true parameters (1.0 is best): <br>")
+function Base.show(io::IO, rr::RecoveryResults)
+    println(io, "Ratio of estimated/true parameters (1.0 is best): ")
     for (f, ratio) in parameter_accuracy_ratios(rr)
-        print(io, "<pre>  ",
-              f, " => ", round.(ratio, 4), 
-              "</pre>")
+        println(io, "  ",
+                f, " => ", round.(ratio*1000)/1000) 
     end
     # This functionality was neat, but requiring Plots is not nice.
     # show(io, MIME"text/html"(),
