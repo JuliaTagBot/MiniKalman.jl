@@ -19,6 +19,7 @@ abstract type Model end
 """ Create a new model of the same type as `model`, but with the given `params`.
 This is meant to be used with Optim.jl. Inspired from sklearn's `set_params`. """
 function set_params(model::Model, params::AbstractVector, names=fieldnames(typeof(model)))
+    # Not efficient, but doesn't really have to be for significant input length.
     i = 1
     upd = Dict()
     for name in names
@@ -47,10 +48,8 @@ marginal_std(args...) = sqrt(marginal_var(args...))
 marginal(g::Gaussian, i::Int) = Gaussian(mean(g)[i], marginal_var(g, i))
 is_marginal(g::Gaussian) = dim(g) == 1
 
-kalman_quantities = [:observation_mat, :observation_mats, 
-                     :observation_noise, :observation_noises, 
-                     :transition_mat, :transition_mats,
-                     :transition_noise, :transition_noises,
+kalman_quantities = [:observation_mat, :observation_noise,
+                     :transition_mat, :transition_noise,
                      :initial_state, :observation, :labels]
 for q in kalman_quantities
     @eval function $q end  # forward declarations
@@ -111,7 +110,7 @@ end
 
 function log_likelihood(m::Model, inputs, observations=nothing;
                         initial_state=MiniKalman.initial_state(m))
-    # Since this is in the inner loop of `optimize`, it's written out explicitly.
+    # Since this is in the inner loop of `optimize`, we make sure it's non-allocating
     ll_sum = 0.0
     state = make_full(initial_state)
     for t in 1:length(inputs)
