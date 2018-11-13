@@ -1,11 +1,8 @@
 # This code is 100% built _on top_ of MiniKalman.jl
 
 using Unitful
-using MacroTools
-using MacroTools: postwalk
 using Optim
-using QuickTypes
-using QuickTypes: roottypeof
+using QuickTypes: roottypeof  # TODO: get rid of dependency
 
 export @kalman_model, sample_and_recover, optimize, marginal
 
@@ -53,12 +50,11 @@ end
 
 # Defaults
 transition_mat(m, inputs, i) = Identity()
-transition_noise(m, inputs, i) = Zero() 
-observation_mat(m, inputs, i) = Identity() 
+transition_noise(m, inputs, i) = Zero()
+observation_mat(m, inputs, i) = Identity()
 
 
 ################################################################################
-## Delegations
 
 full_initial_state(m) = make_full(initial_state(m))
 
@@ -118,7 +114,7 @@ end
 
 function kalman_smoother!(smoothed_states, m::Model, inputs, filtered_states;
                           steps=length(smoothed_states)-1:-1:1)
-    @assert steps[1] >= steps[end]
+    @assert steps[1] >= steps[end] "`steps` must be in descending order"
     for t in steps
         smoothed_states[t] =
               ksmoother(filtered_states[t], smoothed_states[t+1],
@@ -166,6 +162,7 @@ function Optim.optimize(model0::Model, inputs,
                         parameters_to_optimize=fieldnames(typeof(model0)), 
                         method=LBFGS(linesearch=Optim.LineSearches.BackTracking()),
                         kwargs...)
+    # It would be nice not to need split_units
     initial_x, units = split_units(get_params(model0, parameters_to_optimize))
     function objective(params)
         model = set_params(model0, params .* units, parameters_to_optimize)
@@ -178,28 +175,6 @@ function Optim.optimize(model0::Model, inputs,
     best_model = set_params(model0, Optim.minimizer(o) .* units, parameters_to_optimize)
     return (best_model, o)
 end
-
-function plot_hidden_state!(p, time, marginals; true_state=nothing,
-                            label="estimate", kwargs...)
-    P = Main.Plots
-    @assert is_marginal(marginals[1]) "Must pass a marginal gaussian."
-    P.plot!(p, time, first.(mean.(marginals)); label=label,
-            ribbon=first.(sqrt.(cov.(marginals))), msa=0.5, kwargs...)
-    if true_state !== nothing
-        P.plot!(p, time, getindex.(true_state, i); label="truth",
-                linestyle=:dash, color=:orange)
-    end
-    p
-end
-plot_hidden_state(time, estimates; true_state=nothing,
-                  ylabels=["hidden_state[$i]" for i in 1:dim(estimates[1])],
-                  kwargs...) =
-    Main.Plots.plot([plot_hidden_state(time, marginal(estimates, i);
-                                       true_state=true_state,
-                                       ylabel=ylabels[i], kwargs...)
-                     for i in 1:dim(estimates[1])]...)
-
-
 
 struct RecoveryResults
     true_model
