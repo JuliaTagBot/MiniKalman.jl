@@ -1,4 +1,5 @@
 /KalmanCore.jl~
+/filtering.jl~
 /identities.jl~
 /kalman_models.jl~
 /smoothing.jl~
