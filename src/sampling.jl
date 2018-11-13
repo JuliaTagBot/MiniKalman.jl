@@ -18,14 +18,14 @@ end
 ################################################################################
 # sample_and_recover
 
-""" A data structure """
+""" A data structure containing the results of `sample_and_recover`. """
 struct RecoveryResults
-    true_model
-    estimated_model
-    true_state
-    estimated_state
-    obs
-    optim
+    true_model       # the true model, passed by the user
+    estimated_model  # the model estimated from maximum likelihood
+    true_samples     # the samples generated from the true model
+    estimated_state  # the P(state|observation, estimated_model) distributions 
+    obs              # the sampled observations
+    optim            # the result from calling `optimize` (contains convergence details)
 end
 parameter_accuracy_ratios(rr::RecoveryResults) =
     [f=>getfield(rr.estimated_model, f) ./ getfield(rr.true_model, f)
@@ -41,21 +41,26 @@ function Base.show(io::IO, ::MIME"text/html", rr::RecoveryResults)
     # This functionality was neat, but requiring Plots is not nice.
     # show(io, MIME"text/html"(),
     #      plot_hidden_state(1:length(rr.obs), rr.estimated_state;
-    #                        true_state=rr.true_state))
+    #                        true_samples=rr.true_samples))
 end
 
 """ See if we can recover the model parameters _and_ the true parameters using
 data generated from the model.
 
 Concretely, we sample observations and hidden state from `true_model` for the
-given `inputs`, then call `optimize` on `true_model * fuzz_factor`."""
+given `inputs`, then call `optimize` on `true_model * fuzz_factor`.
+
+If `start_model` isn't specified, we start from a model in the neighborhood of 
+`true_model` (with `fuzz_factor ~= 1.0` controlling how far we start).
+
+We return a `RecoveryResults` object. See its definition for details. """
 function sample_and_recover(true_model::Model, inputs, rng;
                             parameters_to_optimize=fieldnames(typeof(true_model)),
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model, parameters_to_optimize)))),
                             initial_state::Gaussian=initial_state(true_model),
                             start_model=nothing)
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
-    true_state, obs = kalman_sample(true_model, inputs, rng, rand(rng, initial_state))
+    true_samples, obs = kalman_sample(true_model, inputs, rng, rand(rng, initial_state))
     if start_model === nothing
         start_model = set_params(true_model,
                                  (get_params(true_model, parameters_to_optimize) .*
@@ -67,5 +72,5 @@ function sample_and_recover(true_model::Model, inputs, rng;
                                parameters_to_optimize=parameters_to_optimize)
     estimated_state = kalman_smoother(best_model, inputs, obs,
                                       initial_state=initial_state)
-    return RecoveryResults(true_model, best_model, true_state, estimated_state, obs, o)
+    return RecoveryResults(true_model, best_model, true_samples, estimated_state, obs, o)
 end
