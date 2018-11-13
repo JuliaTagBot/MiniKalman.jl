@@ -67,6 +67,19 @@ observation_mat(m, inputs, i) = Identity()
 
 full_initial_state(m) = make_full(initial_state(m))
 
+function output_vectors(m::Model, einputs, observations=nothing; length=length(einputs),
+                        initial_state=initial_state(m))
+    state = make_full(initial_state)
+    # For type stability, we fake-run it. It's rather lame. Ideally, we'd build all
+    # output types from the input types
+    state2, _, dum_predictive = kfilter(state, m, einputs, 1, observations)
+    @assert typeof(state) == typeof(state2)
+    filtered_states = Vector{typeof(state)}(undef, length)
+    predicted_obs = Vector{typeof(dum_predictive)}(undef, length)
+    lls = Vector{Float64}(undef, length)
+    return (filtered_states, lls, predicted_obs)
+end
+
 kfilter(prev_state::Gaussian, m::MiniKalman.Model, inp, t::Int, observations=nothing) = 
     kfilter(prev_state, transition_mat(m, inp, t),
             transition_noise(m, inp, t),
@@ -87,19 +100,6 @@ function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
     end
 end
 
-function output_vectors(m::Model, einputs, observations=nothing; length=length(einputs),
-                        initial_state=initial_state(m))
-    state = make_full(initial_state)
-    # For type stability, we fake-run it. It's rather lame. Ideally, we'd build all
-    # output types from the input types
-    state2, _, dum_predictive = kfilter(state, m, einputs, 1, observations)
-    @assert typeof(state) == typeof(state2)
-    filtered_states = Vector{typeof(state)}(undef, length)
-    predicted_obs = Vector{typeof(dum_predictive)}(undef, length)
-    lls = Vector{Float64}(undef, length)
-    return (filtered_states, lls, predicted_obs)
-end
-
 function kalman_filter(m::Model, inputs, observations=nothing;
                        initial_state=initial_state(m), steps=1:length(inputs))
     N = length(steps)
@@ -111,6 +111,7 @@ end
 
 function log_likelihood(m::Model, inputs, observations=nothing;
                         initial_state=MiniKalman.initial_state(m))
+    # Since this is in the inner loop of `optimize`, it's written out explicitly.
     ll_sum = 0.0
     state = make_full(initial_state)
     for t in 1:length(inputs)
@@ -119,8 +120,6 @@ function log_likelihood(m::Model, inputs, observations=nothing;
     end
     return ll_sum
 end
-
-map_i(f, m, inputs) = mappedarray(i->f(m, inputs, i), 1:length(inputs))
 
 function kalman_smoother!(smoothed_states, m::Model, inputs, filtered_states;
                           steps=length(smoothed_states)-1:-1:1)
@@ -144,13 +143,18 @@ kalman_smoother(m::Model, inputs, observations=nothing;
     kalman_smoother(m, inputs, kalman_filtered(m, inputs, observations;
                                                initial_state=initial_state))
 
-function kalman_sample(m::Model, inputs, rng::AbstractRNG,
-                       start_state)
-    kalman_sample(rng, start_state,
-                  map_i(observation_noise, m, inputs);
-                  transition_mats=map_i(transition_mat, m, inputs),
-                  transition_noises=map_i(transition_noise, m, inputs),
-                  observation_mats=map_i(observation_mat, m, inputs))
+function kalman_sample(m::Model, inputs, rng::AbstractRNG, start_state, N=length(inputs))
+    # This code was optimized in 0.6, but sampling doesn't usually have to be
+    # hyper-efficient, and it would look cleaner with a loop.
+    result = accumulate(1:N; init=(start_state, nothing)) do v, t
+        state, _ = v
+        next_state = transition_mat(m, inputs, t) * state +
+            rand(rng, transition_noise(m, inputs, t))
+        return (next_state,
+                observation_mat(m, inputs, t) * next_state +
+                rand(rng, observation_noise(m, inputs, t)))
+    end
+    return (map(first, result), map(last, result))
 end
 
 ################################################################################
@@ -192,8 +196,6 @@ function plot_hidden_state!(p, time, marginals; true_state=nothing,
     end
     p
 end
-# plot_hidden_state(a, b; kwargs...) =
-#     plot_hidden_state!(Main.Plots.plot(), a, b; kwargs...)
 plot_hidden_state(time, estimates; true_state=nothing,
                   ylabels=["hidden_state[$i]" for i in 1:dim(estimates[1])],
                   kwargs...) =
@@ -223,10 +225,16 @@ function Base.show(io::IO, ::MIME"text/html", rr::RecoveryResults)
               f, " => ", round.(ratio, 4), 
               "</pre>")
     end
-    show(io, MIME"text/html"(),
-         plot_hidden_state(1:length(rr.obs), rr.estimated_state;
-                           true_state=rr.true_state))
+    # show(io, MIME"text/html"(),
+    #      plot_hidden_state(1:length(rr.obs), rr.estimated_state;
+    #                        true_state=rr.true_state))
 end
+
+################################################################################
+# Sampling
+
+# This is essentially the definition of sampling from a dirac delta. 
+Base.rand(RNG, P::Gaussian{U, Zero}) where U = P.μ
 
 """ See if we can recover the model parameters _and_ the true parameters using
 data generated from the model.

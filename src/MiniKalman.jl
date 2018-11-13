@@ -153,34 +153,6 @@ function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
                     Σₜₜ + J * (Σₜ₁T - Σₜ₁ₜ) * J')
 end
 
-################################################################################
-# Sampling
-
-# This is essentially the definition of sampling from a dirac delta. 
-Base.rand(RNG, P::Gaussian{U, Zero}) where U = P.μ
-
-""" Returns `(hidden_state::Vector, observations::Vector)` """
-function kalman_sample(rng::AbstractRNG, start_state,
-                       observation_noises::AbstractVector{<:Gaussian};
-                       _N=length(observation_noises), # to help create defaults
-                       transition_mats::AbstractVector=Fill(Identity(), _N),
-                       transition_noises::AbstractVector{<:Gaussian}=
-                           Fill(no_noise(), _N),
-                       observation_mats::AbstractVector=Fill(Identity(), _N))
-    @assert(length(transition_mats) ==
-            length(transition_noises) == length(observation_mats) ==
-            length(observation_noises),
-            "All passed vectors should be of the same length")
-    result = accumulate(1:_N; init=(start_state, nothing)) do v, t
-        state, _ = v
-        next_state = transition_mats[t] * state + rand(rng, transition_noises[t])
-        return (next_state,
-                observation_mats[t] * next_state + rand(rng, observation_noises[t]))
-    end
-    return (map(first, result), map(last, result))
-end
-
-
 include("kalman_models.jl")
 
 end  # module
