@@ -18,6 +18,7 @@ end
 ################################################################################
 # sample_and_recover
 
+""" A data structure """
 struct RecoveryResults
     true_model
     estimated_model
@@ -37,6 +38,7 @@ function Base.show(io::IO, ::MIME"text/html", rr::RecoveryResults)
               f, " => ", round.(ratio, 4), 
               "</pre>")
     end
+    # This functionality was neat, but requiring Plots is not nice.
     # show(io, MIME"text/html"(),
     #      plot_hidden_state(1:length(rr.obs), rr.estimated_state;
     #                        true_state=rr.true_state))

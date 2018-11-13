@@ -27,11 +27,11 @@ get_params(model::Model, names=fieldnames(typeof(model))) =
 split_units(vec::Vector) = ustrip.(vec), unit.(vec)
 
 """ Finds a set of model parameters that attempts to maximize the log-likelihood
-on the given dataset. Returns `(best_model, optim_object)`. """
+on the given dataset. Returns `(best_model, optim_output_object)`. """
 function Optim.optimize(model0::Model, inputs,
                         observations::Union{Nothing, AbstractVector}=nothing;
                         initial_state=MiniKalman.initial_state(model0),
-                        min=0.0, # 0.0 is a bit arbitrary...
+                        min=0.0, # 0.0 is arbitrary... see below
                         parameters_to_optimize=fieldnames(typeof(model0)), 
                         method=LBFGS(linesearch=Optim.LineSearches.BackTracking()),
                         kwargs...)
@@ -42,6 +42,7 @@ function Optim.optimize(model0::Model, inputs,
         return -log_likelihood(model, inputs, observations; initial_state=initial_state)
     end
     td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
+    # Tell Optim that no parameter can be below `mins`. This should be made optional, TODO
     mins = min isa AbstractVector ? min : fill(min, length(initial_x))
     maxes = fill(Inf, length(initial_x))
     o = optimize(td, mins, maxes, initial_x, Fminbox(method), Optim.Options(; kwargs...))
