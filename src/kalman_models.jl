@@ -1,6 +1,6 @@
 # This code is 100% built _on top_ of MiniKalman.jl
 
-using Unitful
+using Unitful: ustrip, unit   # could be @required ?
 using Optim
 using QuickTypes: roottypeof  # TODO: get rid of dependency
 

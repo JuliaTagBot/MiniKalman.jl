@@ -2,11 +2,10 @@ module MiniKalman
 
 using GaussianDistributions, FillArrays
 using GaussianDistributions: dim, logpdf
-using MappedArrays
 using StaticArrays
 using Statistics, Random, LinearAlgebra
 
-export kfilter, kalman_filter, white_noise, white_noise1, white_noise2,
+export kfilter, kalman_filter, white_noise1, white_noise2,
     kalman_smoother, kalman_sample, no_noise, log_likelihood, cumulative_log_likelihood
 
 ################################################################################
@@ -44,11 +43,7 @@ white_noise2(a) =
     # sqrt(zero(a)) is non-differentiable, but zero(sqrt(a)) is.
     Gaussian(SVector(zero(sqrt(a))), SMatrix{1,1}(a))
 white_noise2(a, b) = Gaussian(SVector(zero(sqrt(a)), zero(sqrt(b))), SDiagonal(a, b))
-# TODO: eventually have white_noise = white_noise1 and maybe stop exporting white_noise2
-# since it's counter-intuitive, and deprecate white_noise1.
-# We've been white_noise-free since June 7th.
 white_noise1(args...) = white_noise2((args.^2)...)
-white_noise(args...) = white_noise1(args...)
 Random.rand(RNG::AbstractRNG, g::Gaussian{<:SVector{1}}) =  # type piracy!
     # otherwise calls Cholesky, which fails with unitful Gaussians
     SVector(rand(RNG, Gaussian(mean(g)[1], cov(g)[1])))
