@@ -1,5 +1,4 @@
-- observation
+- `observation(m, inputs, t)`
 - initial_state
 - TODO: tests
-- Optim comments
 - Was only tested with `SVector`/`SMatrix`. Might have problems with plain arrays.

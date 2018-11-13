@@ -1,7 +1,9 @@
 using Optim
 
 """ Create a new model of the same type as `model`, but with the given `params`.
-This is meant to be used with Optim.jl. Inspired from sklearn's `set_params`. """
+This is meant to be used with Optim.jl. Inspired from sklearn's `set_params`. 
+
+This is an internal function."""
 function set_params(model::Model, params::AbstractVector, names=fieldnames(typeof(model)))
     # Not efficient, but doesn't really have to be for significant input length.
     i = 1
@@ -19,6 +21,22 @@ function set_params(model::Model, params::AbstractVector, names=fieldnames(typeo
     end
     return roottypeof(model)(; kwargs...)
 end
+
+""" Do one round of flattening, eg.
+
+```
+julia> struct MyModel <: MiniKalman.Model  # of course, should use @with_kw
+           a
+           b
+       end
+
+julia> MiniKalman.get_params(MyModel(2, [3,4]))
+3-element Array{Int64,1}:
+ 2
+ 3
+ 4
+```
+"""
 get_params(model::Model, names=fieldnames(typeof(model))) =
     [x for v in names for x in getfield(model, v)]
 

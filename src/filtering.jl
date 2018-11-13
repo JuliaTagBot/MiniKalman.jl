@@ -1,12 +1,4 @@
-kalman_quantities = [:observation_mat, :observation_noise,
-                     :transition_mat, :transition_noise,
-                     :initial_state, :observation, :labels]
-for q in kalman_quantities
-    @eval function $q end  # forward declarations
-end
-
-################################################################################
-# Model
+## Model definition
 
 """ `Model` objects assume that there is a pure-kwarg constructors (such as provided by
 Parameters.jl) """
@@ -16,6 +8,10 @@ abstract type Model end
 transition_mat(m, inputs, i) = Identity()
 transition_noise(m, inputs, i) = Zero()
 observation_mat(m, inputs, i) = Identity()
+function observation_noise end  # necessary for all models
+function observation end        # optional; you can pass `observations=...` instead
+function initial_state end      # optional; you can pass `initial_state=...` instead
+function labels end             # for pretty-printing
 
 ################################################################################
 
@@ -78,6 +74,8 @@ kfilter(prev_state::Gaussian, m::MiniKalman.Model, inputs, t::Int, observations=
 states, likelihoods, and P(observation). """
 function output_vectors(m::Model, inputs, observations=nothing; length=length(inputs),
                         initial_state=initial_state(m))
+    # Note: this function was split off for our own internal purposes (switching states)
+    # It could be merged back into `kalman_filter!`
     state = make_full(initial_state)
     # The type of the state might change after one round of Kalman filtering,
     # so for type-stability reasons, we have to fake-run it once. It's a bit lame.
@@ -89,18 +87,19 @@ function output_vectors(m::Model, inputs, observations=nothing; length=length(in
     return (filtered_states, lls, predicted_obs)
 end
 
-function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
+function kalman_filter!(out::AbstractVector, lls::AbstractVector,
                         predicted_obs::AbstractVector,
                         m::Model, inputs, observations=nothing;
-                        steps::AbstractRange=1:length(filtered_states),
+                        steps::AbstractRange=1:length(out),
                         initial_state=(steps[1]==1 ? initial_state(m) :
-                                       filtered_states[steps[1]-1]))
+                                       out[steps[1]-1]))
     state = make_full(initial_state)  # we need make_full so that the state does
                                       # not change type during iteration
     for t in steps
         state, lls[t], predicted_obs[t] = kfilter(state, m, inputs, t, observations)
-        filtered_states[t] = state
+        out[t] = state
     end
+    out
 end
 
 function kalman_filter(m::Model, inputs, observations=nothing;
