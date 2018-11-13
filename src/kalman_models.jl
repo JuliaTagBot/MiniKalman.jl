@@ -3,11 +3,9 @@
 using Unitful
 using MacroTools
 using MacroTools: postwalk
-using Parameters  # for @with_kw
 using Optim
 using QuickTypes
 using QuickTypes: roottypeof
-import GaussianDistributions
 
 export @kalman_model, sample_and_recover, optimize, marginal
 
@@ -16,6 +14,8 @@ export @kalman_model, sample_and_recover, optimize, marginal
 
 abstract type Model end
 
+get_params(model::Model, names=fieldnames(typeof(model))) =
+    [x for v in names for x in getfield(model, v)]
 """ Create a new model of the same type as `model`, but with the given `params`.
 This is meant to be used with Optim.jl. Inspired from sklearn's `set_params`. """
 function set_params(model::Model, params::AbstractVector, names=fieldnames(typeof(model)))
@@ -36,12 +36,8 @@ function set_params(model::Model, params::AbstractVector, names=fieldnames(typeo
     # Assumes that there's a pure-kwarg constructor of the object
     return roottypeof(model)(; kwargs...)
 end
-get_params(model::Model, names=fieldnames(typeof(model))) =
-    [x for v in names for x in getfield(model, v)]
 
 ################################################################################
-const Inputs = Any # deprecated
-
 marginal_var(g::Gaussian) = diag(cov(g))
 marginal_var(g::Gaussian, i::Int) = diag(cov(g))[i]
 marginal_std(args...) = sqrt(marginal_var(args...))
