@@ -27,15 +27,15 @@ function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
                     Σₜₜ + J * (Σₜ₁T - Σₜ₁ₜ) * J')
 end
 
-function kalman_smoother!(smoothed_states, m::Model, inputs, filtered_states;
-                          steps=length(smoothed_states)-1:-1:1)
+function kalman_smoother!(out, m::Model, inputs, filtered_states;
+                          steps=length(out)-1:-1:1)
     @assert steps[1] >= steps[end] "`steps` must be in descending order"
     for t in steps
-        smoothed_states[t] =
-              ksmoother(filtered_states[t], smoothed_states[t+1],
-                        transition_mat(m, inputs, t+1),
-                        transition_noise(m, inputs, t+1))
+        out[t] = ksmoother(filtered_states[t], out[t+1],
+                           transition_mat(m, inputs, t+1),
+                           transition_noise(m, inputs, t+1))
     end
+    return out
 end
 
 """ Compute the smoothed estimates given the filtered estimates. """

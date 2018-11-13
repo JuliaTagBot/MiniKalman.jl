@@ -65,8 +65,7 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
 end
 
 kfilter(prev_state::Gaussian, m::MiniKalman.Model, inputs, t::Int, observations=nothing) =
-    kfilter(prev_state, transition_mat(m, inputs, t),
-            transition_noise(m, inputs, t),
+    kfilter(prev_state, transition_mat(m, inputs, t), transition_noise(m, inputs, t),
             observations===nothing ? observation(inputs, t) : observations[t],
             observation_mat(m, inputs, t), observation_noise(m, inputs, t))
 
