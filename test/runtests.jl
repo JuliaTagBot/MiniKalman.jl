@@ -1,8 +1,6 @@
 using Test
 using MiniKalman, GaussianDistributions, StaticArrays, FillArrays, Statistics, Random,
-    Unitful
-
-using Revise, MiniKalman, Parameters, StaticArrays, Random, Test
+    Unitful, Parameters
 
 @with_kw struct RandomWalk <: MiniKalman.Model
     step_size
