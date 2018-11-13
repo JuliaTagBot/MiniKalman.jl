@@ -1,7 +1,8 @@
 # This is essentially the definition of sampling from a dirac delta. 
 Base.rand(RNG, P::Gaussian{U, Zero}) where U = P.μ
 
-function kalman_sample(m::Model, inputs, rng::AbstractRNG, start_state, N=length(inputs))
+function kalman_sample(m::Model, inputs, rng::AbstractRNG, start_state,
+                       N::Integer=length(inputs))
     # This code was optimized in 0.6, but sampling doesn't usually have to be
     # hyper-efficient, and it would look cleaner with a loop.
     result = accumulate(1:N; init=(start_state, nothing)) do v, t
@@ -53,7 +54,7 @@ If `start_model` isn't specified, we start from a model in the neighborhood of
 `true_model` (with `fuzz_factor ~= 1.0` controlling how far we start).
 
 We return a `RecoveryResults` object. See its definition for details. """
-function sample_and_recover(true_model::Model, inputs, N=nothing; rng=GLOBAL_RNG,
+function sample_and_recover(true_model::Model, inputs, N=length(inputs); rng=GLOBAL_RNG,
                             parameters_to_optimize=fieldnames(typeof(true_model)),
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model, parameters_to_optimize)))),
                             initial_state::Gaussian=initial_state(true_model),
