@@ -27,8 +27,8 @@ predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussia
 """ Perform one step of Kalman filtering, for online use. We assume equations:
 
 ```julia
-current_state = transition_mat * state_prior + transition_noise
-observation = observation_mat * current_state + observation_noise
+    current_state = transition_mat * state_prior + transition_noise
+    observation = observation_mat * current_state + observation_noise
 ```
 
 and return this tuple:
@@ -68,20 +68,20 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
     return (filtered_state, ll, predicted_obs)
 end
 
-kfilter(prev_state::Gaussian, m::MiniKalman.Model, inp, t::Int, observations=nothing) = 
-    kfilter(prev_state, transition_mat(m, inp, t),
-            transition_noise(m, inp, t),
-            observations===nothing ? observation(inp, t) : observations[t],
-            observation_mat(m, inp, t), observation_noise(m, inp, t))
+kfilter(prev_state::Gaussian, m::MiniKalman.Model, inputs, t::Int, observations=nothing) =
+    kfilter(prev_state, transition_mat(m, inputs, t),
+            transition_noise(m, inputs, t),
+            observations===nothing ? observation(inputs, t) : observations[t],
+            observation_mat(m, inputs, t), observation_noise(m, inputs, t))
 
 """ (Internal function) return three vectors, appropriate for storing 
 states, likelihoods, and P(observation). """
-function output_vectors(m::Model, einputs, observations=nothing; length=length(einputs),
+function output_vectors(m::Model, inputs, observations=nothing; length=length(inputs),
                         initial_state=initial_state(m))
     state = make_full(initial_state)
-    # For type stability, we fake-run it. It's rather lame. Ideally, we'd build all
-    # output types from the input types
-    state2, _, dum_predictive = kfilter(state, m, einputs, 1, observations)
+    # The type of the state might change after one round of Kalman filtering,
+    # so for type-stability reasons, we have to fake-run it once. It's a bit lame.
+    state2, _, dum_predictive = kfilter(state, m, inputs, 1, observations)
     @assert typeof(state) == typeof(state2)
     filtered_states = Vector{typeof(state)}(undef, length)
     predicted_obs = Vector{typeof(dum_predictive)}(undef, length)

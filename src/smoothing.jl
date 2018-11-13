@@ -1,8 +1,8 @@
 """ Compute the smoothed belief state at step `t`, given the `t+1`'th smoothed belief
-state. """
-
+state. Here, "next" === t+1 """
 function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
                    next_transition_mat, next_transition_noise::Gaussian)
+    # Again, taken from Murphy
     # Notation:
     #    ₜ₁ means t+1
     #    Xₜₜ means (Xₜ|data up to t)
@@ -38,13 +38,12 @@ function kalman_smoother!(smoothed_states, m::Model, inputs, filtered_states;
     end
 end
 
-function kalman_smoother(m::Model, inputs,
-                         filtered_states::AbstractVector{<:Gaussian})
+""" Compute the smoothed estimates given the filtered estimates. """
+function kalman_smoother(m::Model, inputs, filtered_states::AbstractVector{<:Gaussian})
     smoothed_states = fill(filtered_states[end], length(filtered_states))
     kalman_smoother!(smoothed_states, m, inputs, filtered_states)
     return smoothed_states
 end
-kalman_smoother(m::Model, inputs, observations=nothing;
-                initial_state=initial_state(m)) =
+kalman_smoother(m::Model, inputs, observations=nothing; initial_state=initial_state(m)) =
     kalman_smoother(m, inputs, kalman_filtered(m, inputs, observations;
                                                initial_state=initial_state))
