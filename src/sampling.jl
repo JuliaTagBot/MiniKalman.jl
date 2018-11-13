@@ -54,13 +54,15 @@ If `start_model` isn't specified, we start from a model in the neighborhood of
 `true_model` (with `fuzz_factor ~= 1.0` controlling how far we start).
 
 We return a `RecoveryResults` object. See its definition for details. """
-function sample_and_recover(true_model::Model, inputs, rng;
+function sample_and_recover(true_model::Model, inputs, N=nothing; rng=GLOBAL_RNG,
                             parameters_to_optimize=fieldnames(typeof(true_model)),
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model, parameters_to_optimize)))),
                             initial_state::Gaussian=initial_state(true_model),
                             start_model=nothing)
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
-    true_samples, obs = kalman_sample(true_model, inputs, rng, rand(rng, initial_state))
+    true_samples, obs =
+        kalman_sample(true_model, inputs, rng, rand(rng, initial_state), N)
+    log_likelihood(true_model, inputs, obs)
     if start_model === nothing
         start_model = set_params(true_model,
                                  (get_params(true_model, parameters_to_optimize) .*

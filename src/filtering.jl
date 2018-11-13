@@ -4,9 +4,9 @@
 Parameters.jl) """
 abstract type Model end
 
-# Defaults
+# Models should implement these functions (or rely on the defaults)
 transition_mat(m, inputs, i) = Identity()
-transition_noise(m, inputs, i) = Zero()
+transition_noise(m, inputs, i) = no_noise()
 observation_mat(m, inputs, i) = Identity()
 function observation_noise end  # necessary for all models
 function observation end        # optional; you can pass `observations=...` instead
@@ -23,7 +23,7 @@ predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussia
 """ Perform one step of Kalman filtering, for online use. We assume equations:
 
 ```julia
-    current_state = transition_mat * state_prior + transition_noise
+    current_state = transition_mat * previous_state + transition_noise
     observation = observation_mat * current_state + observation_noise
 ```
 
@@ -112,7 +112,8 @@ function kalman_filter(m::Model, inputs, observations=nothing;
 end
 
 function log_likelihood(m::Model, inputs, observations=nothing;
-                        initial_state=MiniKalman.initial_state(m), steps=1:length(inputs))
+                        initial_state=MiniKalman.initial_state(m),
+                        steps=1:length(observations===nothing ? inputs : observations))
     # Since this is in the inner loop of `optimize`, we make sure it's non-allocating
     ll_sum = 0.0
     state = make_full(initial_state)
@@ -122,7 +123,6 @@ function log_likelihood(m::Model, inputs, observations=nothing;
     end
     return ll_sum
 end
-
 
 kalman_filtered(args...; kwargs...) = kalman_filter(args...; kwargs...)[1]  # convenience
 

@@ -15,7 +15,6 @@ YY_vec = map(SVector, YY)
 xxf2, ll2 = kalman_filter(Gaussian([20., 20.0], [1000.0 0; 0 1000.0]), YY_vec,
                           Fill(MiniKalman.white_noise1(10.0), N),
                           observation_mats=XX_mat)
-ll2
 
 xf = mean(xxf2[end])
 @test xf ≈ XX[1, :, :]' \ YY rtol=0.01
