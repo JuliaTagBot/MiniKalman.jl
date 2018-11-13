@@ -74,7 +74,7 @@ states, likelihoods, and P(observation). """
 function output_vectors(m::Model, inputs, observations=nothing; length=length(inputs),
                         initial_state=initial_state(m))
     # Note: this function was split off for our own internal purposes (switching states)
-    # It could be merged back into `kalman_filter!`
+    # It could be merged back into `kalman_filter!`, I suppose.
     state = make_full(initial_state)
     # The type of the state might change after one round of Kalman filtering,
     # so for type-stability reasons, we have to fake-run it once. It's a bit lame.
@@ -86,19 +86,21 @@ function output_vectors(m::Model, inputs, observations=nothing; length=length(in
     return (filtered_states, lls, predicted_obs)
 end
 
-function kalman_filter!(out::AbstractVector, lls::AbstractVector,
+""" Perform Kalman filtering and store the results in the `filtered_states, lls, 
+predicted_obs` vectors, for the given `steps`. """
+function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
                         predicted_obs::AbstractVector,
                         m::Model, inputs, observations=nothing;
-                        steps::AbstractRange=1:length(out),
+                        steps::AbstractRange=1:length(filtered_states),
                         initial_state=(steps[1]==1 ? initial_state(m) :
-                                       out[steps[1]-1]))
+                                       filtered_states[steps[1]-1]))
     state = make_full(initial_state)  # we need make_full so that the state does
                                       # not change type during iteration
     for t in steps
         state, lls[t], predicted_obs[t] = kfilter(state, m, inputs, t, observations)
-        out[t] = state
+        filtered_states[t] = state
     end
-    out
+    filtered_states
 end
 
 function kalman_filter(m::Model, inputs, observations=nothing;
