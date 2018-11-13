@@ -1,3 +1,5 @@
 /KalmanCore.jl~
 /identities.jl~
 /kalman_models.jl~
+/smoothing.jl~
+/utils.jl~
