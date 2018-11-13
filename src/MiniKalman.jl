@@ -55,11 +55,6 @@ Random.rand(RNG::AbstractRNG, g::Gaussian{<:SVector{1}}) =  # type piracy!
 
 parameters(g::Gaussian) = (mean(g), cov(g))   # convenience
 
-predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussian) =
-    # Helper. Returning a tuple is more convenient than a Gaussian
-    (transition_mat * mean(state_prior) + mean(transition_noise),
-     transition_mat * cov(state_prior) * transition_mat' + cov(transition_noise))
-
 # function Base.lufact(m::SMatrix)
 #     # Necessary for kalman_smoother until StaticArrays#73 (... I guess?)
 #     return lufact(convert(Matrix, m))
@@ -67,10 +62,15 @@ predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussia
 # end
 
 # Type piracy! This (mathematically correct) definition improves filtering speed by 3X!
-# I believe that it could also easily support a diagonal A, but that's not useful for us.
+# I believe that it could also easily support a diagonal A, too.
 # See definitions in Base.
 Base.:\(A::StaticArrays.SArray{Tuple{1,1},<:Any,2,1},
         B::StaticArrays.SArray) = B ./ A[1]
+
+predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussian) =
+    # Helper. Returning a tuple is more convenient than a Gaussian
+    (transition_mat * mean(state_prior) + mean(transition_noise),
+     transition_mat * cov(state_prior) * transition_mat' + cov(transition_noise))
 
 """ Perform one step of Kalman filtering, for online use. We assume equations:
 
@@ -110,17 +110,6 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
     return (filtered_state, ll, predicted_obs)
 end
 
-kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
-              observation_noises::AbstractVector{<:Gaussian};
-              _N=length(observations), # "hidden" kwargs to help create defaults
-              transition_mats::AbstractVector=Fill(Identity(), _N),
-              transition_noises::AbstractVector{<:Gaussian}=
-              Fill(no_noise(), _N),
-              observation_mats::AbstractVector=Fill(Identity(), _N)) =
-    kalman_filter(initial_state_prior, observations,
-                  observation_noises, transition_mats, transition_noises,
-                  observation_mats)
-
 """ `make_full` is a helper """
 make_full(v) = v
 make_full(g::Gaussian) = Gaussian(make_full(mean(g)), make_full(cov(g)))
@@ -131,59 +120,8 @@ make_full(d::SDiagonal{2, Float64}) = @SMatrix [d[1,1] 0.0; 0.0 d[2,2]]
 make_full(d::SDiagonal{N}) where N =  # this version allocates on 0.6!!!
     convert(SMatrix{N,N}, Diagonal(diag(d)))
 
-# I split off the non-kwarg version mostly for `@code_warntype` ease. Revisit in 0.7?
-# It turned out to have a negligible impact on performance anyway. The bottle-neck
-# was elsewhere. TODO: merge them together again?
-function kalman_filter(initial_state_prior::Gaussian, observations::AbstractVector,
-                       observation_noises::AbstractVector{<:Gaussian},
-                       transition_mats::AbstractVector,
-                       transition_noises::AbstractVector{<:Gaussian},
-                       observation_mats::AbstractVector)
-    @assert(length(observations) == length(transition_mats) ==
-            length(transition_noises) == length(observation_mats) ==
-            length(observation_noises),
-            "All passed vectors should be of the same length")
-    state = make_full(initial_state_prior)  # we need make_full to that the state does
-
-    # not change type during iteration
-    # For type stability, we fake-run it. It's rather lame. Ideally, we'd build the
-    # output type from the input types
-    _, _, dum_predictive =
-        kfilter(initial_state_prior, transition_mats[1], transition_noises[1],
-                observations[1], observation_mats[1], observation_noises[1])
-    P = typeof(dum_predictive)
-    T = typeof(state)
-    filtered_states = Vector{T}(undef, length(observations))
-    predicted_obs = Vector{P}(undef, length(observations))
-    lls = Vector{Float64}(undef, length(observations))
-
-    for t in 1:length(observations)
-        state, lls[t], predicted_obs[t] =
-            kfilter(state, transition_mats[t], transition_noises[t],
-                    observations[t], observation_mats[t], observation_noises[t])
-        filtered_states[t] = state::T
-    end
-    return filtered_states, lls, predicted_obs
-end
-
 kalman_filtered(args...; kwargs...) = kalman_filter(args...; kwargs...)[1]  # convenience
 
-function log_likelihood(initial_state_prior::Gaussian, observations::AbstractVector,
-                        observation_noises::AbstractVector{<:Gaussian},
-                        transition_mats::AbstractVector,
-                        transition_noises::AbstractVector{<:Gaussian},
-                        observation_mats::AbstractVector)
-    # Specialized version that doesn't allocate at all. Useful for parameter optimization.
-    ll_sum = 0.0
-    state = make_full(initial_state_prior)
-    for t in 1:length(observations)
-        state, ll, predictive =
-            kfilter(state, transition_mats[t], transition_noises[t],
-                    observations[t], observation_mats[t], observation_noises[t])
-        ll_sum += ll
-    end
-    return ll_sum
-end    
 """ Convenience; returns a vector of the total likelihood up to each step. """
 cumulative_log_likelihood(args...; kwargs...) =
     cumsum(kalman_filter(args...; kwargs...)[2])
@@ -213,21 +151,6 @@ function ksmoother(filtered_state::Gaussian, next_smoothed_state::Gaussian,
     #J = Σₜₜ * Aₜ₁' / Σₜ₁ₜ       # backwards Kalman gain matrix
     return Gaussian(μₜₜ + J * (μₜ₁T - μₜ₁ₜ),
                     Σₜₜ + J * (Σₜ₁T - Σₜ₁ₜ) * J')
-end
-
-function kalman_smoother(filtered_states::AbstractVector{<:Gaussian};
-                         transition_mats::AbstractVector=
-                             Fill(Identity(), length(filtered_states)),
-                         transition_noises::AbstractVector{<:Gaussian}=
-                             Fill(no_noise(),
-                                  length(filtered_states)))
-    smoothed_states = fill(filtered_states[end], length(filtered_states))
-    for t in length(smoothed_states)-1:-1:1
-        smoothed_states[t] =
-              ksmoother(filtered_states[t], smoothed_states[t+1],
-                        transition_mats[t+1], transition_noises[t+1])
-    end
-    return smoothed_states
 end
 
 ################################################################################
