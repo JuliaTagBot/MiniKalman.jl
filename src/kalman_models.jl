@@ -39,9 +39,7 @@ get_params(model::Model, names=fieldnames(typeof(model))) =
     [x for v in names for x in getfield(model, v)]
 
 ################################################################################
-# Inputs
-
-abstract type Inputs end
+const Inputs = Any # deprecated
 
 marginal_var(g::Gaussian) = diag(cov(g))
 marginal_var(g::Gaussian, i::Int) = diag(cov(g))[i]
@@ -64,8 +62,6 @@ transition_noise(m, inputs, i) = Zero()
 observation_mat(m, inputs, i) = Identity() 
 
 
-
-
 ################################################################################
 ## Delegations
 
@@ -79,7 +75,7 @@ kfilter(prev_state::Gaussian, m::MiniKalman.Model, inp, t::Int, observations=not
 
 function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
                         predicted_obs::AbstractVector,
-                        m::Model, inputs::Inputs, observations=nothing;
+                        m::Model, inputs, observations=nothing;
                         steps::AbstractRange=1:length(filtered_states),
                         initial_state=(steps[1]==1 ? full_initial_state(m) :
                                        filtered_states[steps[1]-1]))
@@ -104,7 +100,7 @@ function output_vectors(m::Model, einputs, observations=nothing; length=length(e
     return (filtered_states, lls, predicted_obs)
 end
 
-function kalman_filter(m::Model, inputs::Inputs, observations=nothing;
+function kalman_filter(m::Model, inputs, observations=nothing;
                        initial_state=initial_state(m), steps=1:length(inputs))
     N = length(steps)
     out_vecs = output_vectors(m, inputs, observations, length=N)
@@ -113,7 +109,7 @@ function kalman_filter(m::Model, inputs::Inputs, observations=nothing;
     return out_vecs
 end
 
-function log_likelihood(m::Model, inputs::Inputs, observations=nothing;
+function log_likelihood(m::Model, inputs, observations=nothing;
                         initial_state=MiniKalman.initial_state(m))
     ll_sum = 0.0
     state = make_full(initial_state)
@@ -137,18 +133,18 @@ function kalman_smoother!(smoothed_states, m::Model, inputs, filtered_states;
     end
 end
 
-function kalman_smoother(m::Model, inputs::Inputs,
+function kalman_smoother(m::Model, inputs,
                          filtered_states::AbstractVector{<:Gaussian})
     smoothed_states = fill(filtered_states[end], length(filtered_states))
     kalman_smoother!(smoothed_states, m, inputs, filtered_states)
     return smoothed_states
 end
-kalman_smoother(m::Model, inputs::Inputs, observations=nothing;
+kalman_smoother(m::Model, inputs, observations=nothing;
                 initial_state=MiniKalman.initial_state(m)) =
     kalman_smoother(m, inputs, kalman_filtered(m, inputs, observations;
                                                initial_state=initial_state))
 
-function kalman_sample(m::Model, inputs::Inputs, rng::AbstractRNG,
+function kalman_sample(m::Model, inputs, rng::AbstractRNG,
                        start_state)
     kalman_sample(rng, start_state,
                   map_i(observation_noise, m, inputs);
@@ -164,7 +160,7 @@ split_units(vec::Vector) = ustrip.(vec), unit.(vec)
 
 """ Finds a set of model parameters that attempts to maximize the log-likelihood
 on the given dataset. Returns `(best_model, optim_object)`. """
-function Optim.optimize(model0::Model, inputs::Inputs,
+function Optim.optimize(model0::Model, inputs,
                         observations::Union{Nothing, AbstractVector}=nothing;
                         initial_state=MiniKalman.initial_state(model0),
                         min=0.0, # 0.0 is a bit arbitrary...
@@ -237,7 +233,7 @@ data generated from the model.
 
 Concretely, we sample observations and hidden state from `true_model` for the
 given `inputs`, then call `optimize` on `true_model * fuzz_factor`."""
-function sample_and_recover(true_model::Model, inputs::Inputs, rng;
+function sample_and_recover(true_model::Model, inputs, rng;
                             parameters_to_optimize=fieldnames(typeof(true_model)),
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model, parameters_to_optimize)))),
                             initial_state::Gaussian=initial_state(true_model),
