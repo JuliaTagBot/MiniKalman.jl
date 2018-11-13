@@ -11,110 +11,10 @@ import GaussianDistributions
 
 export @kalman_model, sample_and_recover, optimize, marginal
 
-abstract type Model end
-
 ################################################################################
-# Inputs
+# Model
 
-abstract type Inputs end
-
-marginal_var(g::Gaussian) = diag(cov(g))
-marginal_var(g::Gaussian, i::Int) = diag(cov(g))[i]
-marginal_std(args...) = sqrt(marginal_var(args...))
-marginal(g::Gaussian, i::Int) = Gaussian(mean(g)[i], marginal_var(g, i))
-is_marginal(g::Gaussian) = dim(g) == 1
-
-kalman_quantities = [:observation_mat, :observation_mats, 
-                     :observation_noise, :observation_noises, 
-                     :transition_mat, :transition_mats,
-                     :transition_noise, :transition_noises,
-                     :initial_state, :observation, :labels]
-for q in kalman_quantities
-    @eval function $q end  # forward declarations
-end
-
-# @qstruct_fp EvaluatedInputs(observation_mats, observation_noises, transition_mats,
-#                             transition_noises, initial_state)
-# Base.length(ei::EvaluatedInputs) = length(ei.observation_mats)
-# const Inputs = Union{Inputs, EvaluatedInputs}
-# eval_inputs(::Model, ei::EvaluatedInputs) = ei
-# for q in fieldnames(EvaluatedInputs)
-#     @eval $q(::Model, ei::EvaluatedInputs) = $q(ei)
-#     @eval $q(ei::EvaluatedInputs) = ei.$q
-# end
-
-singular_qty_defaults = quote
-    transition_mat = $MiniKalman.Identity()
-    transition_noise = $MiniKalman.no_noise()
-    observation_mat = $MiniKalman.Identity()
-end
-
-# singular_qty_defaults =
-#     Dict(:transition_mat=>:($MiniKalman.Identity()),
-#          :transition_noise=>:($MiniKalman.no_noise()),
-#          :observation_mat=>:($MiniKalman.Identity()))
-
-qty_defaults = Dict(:transition_mats=>:($MiniKalman.Fill(transition_mat, _N)),
-                    :transition_noises=>:($MiniKalman.Fill(transition_noise, _N)),
-                    :observation_noises=>:($MiniKalman.Fill(observation_noise, _N)),
-                    :observation_mats=>:($MiniKalman.Fill(observation_mat, _N)))
-
-""" See notebook 06 for examples. """
-macro kalman_model(def)
-    @assert(@capture(def, model_type_(; params__) do input_vars__; qtydefs0_ end),
-            "Use @kalman_model M(; param1=..., param2=...) do input1, input2, ... end)")
-    inputs_type = Symbol(model_type, "Inputs")
-    param_vars = map(first ∘ splitarg, params)
-
-    @gensym km ki
-    defined = []  # TODO: use @defined in 0.7
-    label_def = nothing
-    qtydefs = postwalk(qtydefs0) do x
-        # Turn := into =. := is essentially deprecated (July'18)
-        if @capture(x, a_ := b_)
-            push!(defined, a)
-            if a == :labels
-                label_def = 
-                    quote
-                        $MiniKalman.labels($km::$model_type) = $b
-                    end
-            end
-            :($a = $b)
-        else
-            x
-        end
-    end
-
-    proc_param(s::Symbol) = s
-    proc_param(e::Expr) =
-        # Replace :kw with :=, because that's what @with_kw expects
-        (e.head==:kw) ? Expr(:(=), e.args...) : e
-    esc(quote
-        $MiniKalman.@with_kw struct $model_type <: $(MiniKalman.Model) # Parameters.jl#56
-            $(map(proc_param, params)...)
-        end
-        $label_def
-        $MiniKalman.eval_inputs($km::$model_type, $ki::$MiniKalman.Inputs) =
-            # We break $eval_inputs in two definitions, because `expr` should
-            # be evaluated in an environment where all types are known.
-            $MiniKalman.eval_inputs($km, nothing, $ki,
-                                    $([:($km.$p) for p in param_vars]...),
-                                    $([:($ki[$(Expr(:quote, i))])
-                                       for i in input_vars]...))
-        function $MiniKalman.eval_inputs($km::$model_type, ::Void,
-                                         $ki::$MiniKalman.Inputs,
-                                         $(param_vars...), $(input_vars...))
-            _N = length($ki)
-            $singular_qty_defaults
-            # $([:($qty = nothing) for qty in fieldnames(EvaluatedInputs)]...)
-            $qtydefs
-            # $MiniKalman.EvaluatedInputs($(fieldnames(EvaluatedInputs)...))
-            $MiniKalman.EvaluatedInputs($([qty in defined ? qty : qty_defaults[qty]
-                                           for qty in fieldnames(EvaluatedInputs)]...))
-        end
-        $model_type
-    end)
-end
+abstract type Model end
 
 """ Create a new model of the same type as `model`, but with the given `params`.
 This is meant to be used with Optim.jl. Inspired from sklearn's `set_params`. """
@@ -138,18 +38,32 @@ end
 get_params(model::Model, names=fieldnames(typeof(model))) =
     [x for v in names for x in getfield(model, v)]
 
-
 ################################################################################
-## Defaults
-transition_mat(m, inputs, i) = Identity() #transition_noises(m, inputs)[i]
-#transition_mats(m, inputs) = Fill(Identity(), length(inputs))
-transition_noise(m, inputs, i) = Zero() #transition_noises(m, inputs)[i]
-#transition_noises(m, inputs) = Fill(Zero(), length(inputs))
-# observation_noise(inputs::Inputs) = no_noise() is tempting, but it's
-# a degenerate Kalman model, which causes problems
-#observation_noise(m, inputs, i) = observation_noises(m, inputs)[i]
-observation_mat(m, inputs, i) = Identity() #observation_mats(m, inputs)[i]
-#observation_mats(m, inputs) = Fill(Identity(), length(inputs))
+# Inputs
+
+abstract type Inputs end
+
+marginal_var(g::Gaussian) = diag(cov(g))
+marginal_var(g::Gaussian, i::Int) = diag(cov(g))[i]
+marginal_std(args...) = sqrt(marginal_var(args...))
+marginal(g::Gaussian, i::Int) = Gaussian(mean(g)[i], marginal_var(g, i))
+is_marginal(g::Gaussian) = dim(g) == 1
+
+kalman_quantities = [:observation_mat, :observation_mats, 
+                     :observation_noise, :observation_noises, 
+                     :transition_mat, :transition_mats,
+                     :transition_noise, :transition_noises,
+                     :initial_state, :observation, :labels]
+for q in kalman_quantities
+    @eval function $q end  # forward declarations
+end
+
+# Defaults
+transition_mat(m, inputs, i) = Identity()
+transition_noise(m, inputs, i) = Zero() 
+observation_mat(m, inputs, i) = Identity() 
+
+
 
 
 ################################################################################
@@ -342,13 +256,5 @@ function sample_and_recover(true_model::Model, inputs::Inputs, rng;
     estimated_state = kalman_smoother(best_model, inputs, obs,
                                       initial_state=initial_state)
     return RecoveryResults(true_model, best_model, true_state, estimated_state, obs, o)
-end
-
-################################################################################
-
-""" `Positive(Gaussian(...))` is a distribution that samples from `Gaussian`, but
-rejects all negative samples. """
-struct Positive   # JUN11: not used anymore
-    distribution
 end
 
