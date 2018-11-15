@@ -43,6 +43,7 @@ white_noise2(sigma2s...) =
 # fast special-cases
 white_noise2(a) =
     # sqrt(zero(a)) is non-differentiable, but zero(sqrt(a)) is.
+    # Must take the square root to have consistent units
     Gaussian(SVector(zero(sqrt(a))), SMatrix{1,1}(a))
 white_noise2(a, b) = Gaussian(SVector(zero(sqrt(a)), zero(sqrt(b))), SDiagonal(a, b))
 white_noise1(args...) = white_noise2((args.^2)...)
