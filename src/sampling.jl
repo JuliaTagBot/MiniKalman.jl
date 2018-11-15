@@ -64,9 +64,8 @@ function sample_and_recover(true_model::Model, inputs, N=length(inputs); rng=GLO
         kalman_sample(true_model, inputs, rng, rand(rng, initial_state), N)
     log_likelihood(true_model, inputs, obs)
     if start_model === nothing
-        start_model = set_params(true_model,
-                                 (get_params(true_model, parameters_to_optimize) .*
-                                  fuzz_factor),
+        true_params = get_params(true_model, parameters_to_optimize)
+        start_model = set_params(true_model, (true_params .* fuzz_factor),
                                  parameters_to_optimize)
     end
     (best_model, o) = optimize(start_model, inputs, obs;
