@@ -70,6 +70,7 @@ Base.:\(A::StaticArrays.SArray{Tuple{1,1},<:Any,2,1},
 ################################################################################
 # Marginal variance and standard-deviation
 
+# TODO: use GaussianDistributions.conditional? Would be slower.
 marginal_var(g::Gaussian) = diag(cov(g))
 marginal_var(g::Gaussian, i::Int) = diag(cov(g))[i]
 marginal_std(args...) = sqrt(marginal_var(args...))
