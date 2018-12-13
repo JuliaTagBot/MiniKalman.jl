@@ -8,6 +8,7 @@ abstract type Model end
 transition_mat(m, inputs, i) = Identity()
 transition_noise(m, inputs, i) = no_noise()
 observation_mat(m, inputs, i) = Identity()
+skip_observation(m, inputs, i) = false
 function observation_noise end  # necessary for all models
 function observation end        # optional; you can pass `observations=...` instead
 function initial_state end      # optional; you can pass `initial_state=...` instead
@@ -16,12 +17,16 @@ function labels end             # for pretty-printing
 ################################################################################
 
 predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussian) =
-    # Helper. Returning a tuple is more convenient than a Gaussian
-    (transition_mat * mean(state_prior) + mean(transition_noise),
-     transition_mat * cov(state_prior) * transition_mat' + cov(transition_noise))
+    Gaussian(transition_mat * mean(state_prior) + mean(transition_noise),
+             transition_mat * cov(state_prior) * transition_mat' + cov(transition_noise))
 
-function kfilter_obs(state::Gaussian, transition_mat, transition_noise::Gaussian,
-                     observation, observation_mat, observation_noise::Gaussian)
+predicted_state(prev_state::Gaussian, m::MiniKalman.Model, inputs, t::Int) =
+    predicted_state(prev_state, transition_mat(m, inputs, t),
+                    transition_noise(m, inputs, t))
+
+function kfilter_obs(state::Gaussian,
+                     observation, observation_mat, observation_noise::Gaussian,
+                     skip_obs)
     # Following Machine Learning, A probabilistic perspective, by Kevin Murphy, 18.3.1.2,
     # with the exception that I'm setting the forcing term to 0, but allowing noise terms
     # with means (without loss of generality)
@@ -42,12 +47,11 @@ function kfilter_obs(state::Gaussian, transition_mat, transition_noise::Gaussian
     filtered_state = Gaussian(μ + K*r,
                               (I - K*C) * Σ)
     ll = logpdf(predicted_obs, y)  # log-likelihood
-    return (filtered_state, ll, predicted_obs)
+    return (skip_obs ?
+            (state, zero(ll), predicted_obs) :
+            (filtered_state, ll, predicted_obs))
 end
 
-predicted_state(prev_state::Gaussian, m::MiniKalman.Model, inputs, t::Int) =
-    predicted_state(prev_state, transition_mat(m, inputs, t),
-                    transition_noise(m, inputs, t))
 
 """ Perform one step of Kalman filtering, for online use. We assume equations:
 
@@ -69,7 +73,9 @@ To add an "input" term, pass it as `transition_noise = Gaussian(input_term, nois
 kfilter(prev_state::Gaussian, m::MiniKalman.Model, inputs, t::Int, observations=nothing) =
     kfilter_obs(predicted_state(prev_state, m, inputs, t),
                 observations===nothing ? observation(inputs, t) : observations[t],
-                observation_mat(m, inputs, t), observation_noise(m, inputs, t))
+                observation_mat(m, inputs, t), observation_noise(m, inputs, t),
+                skip_observation(m, inputs, t))
+        
 
 """ (Internal function) return three vectors, appropriate for storing 
 states, likelihoods, and P(observation). """
