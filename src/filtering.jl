@@ -5,10 +5,10 @@ Parameters.jl) """
 abstract type Model end
 
 # Models should implement these functions (or rely on the defaults)
-transition_mat(m, inputs, i) = Identity()
-transition_noise(m, inputs, i) = no_noise()
-observation_mat(m, inputs, i) = Identity()
-skip_observation(m, inputs, i) = false
+transition_mat(m::Model, inputs, i) = Identity()
+transition_noise(m::Model, inputs, i) = no_noise()
+observation_mat(m::Model, inputs, i) = Identity()
+skip_observation(m::Model, inputs, i) = false
 function observation_noise end  # necessary for all models
 function observation end        # optional; you can pass `observations=...` instead
 function initial_state end      # optional; you can pass `initial_state=...` instead
