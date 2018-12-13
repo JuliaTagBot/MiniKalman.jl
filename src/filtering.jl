@@ -20,6 +20,35 @@ predicted_state(state_prior::Gaussian, transition_mat, transition_noise::Gaussia
     (transition_mat * mean(state_prior) + mean(transition_noise),
      transition_mat * cov(state_prior) * transition_mat' + cov(transition_noise))
 
+function kfilter_obs(state::Gaussian, transition_mat, transition_noise::Gaussian,
+                     observation, observation_mat, observation_noise::Gaussian)
+    # Following Machine Learning, A probabilistic perspective, by Kevin Murphy, 18.3.1.2,
+    # with the exception that I'm setting the forcing term to 0, but allowing noise terms
+    # with means (without loss of generality)
+
+    Du, R = observation_noise     # Du := Dₜuₜ
+    C = observation_mat
+    y = observation
+
+    # Prediction step (μ_(t|t-1), Σ_(t|t-1))
+    μ, Σ = state 
+    ŷ = C * μ + Du               # Murphy forgot the Du term in his book
+    S = C * Σ * C' + R
+    predicted_obs = Gaussian(ŷ, S)
+    
+    # Filter
+    K = Σ * C' / S         # Kalman gain matrix
+    r = y - ŷ
+    filtered_state = Gaussian(μ + K*r,
+                              (I - K*C) * Σ)
+    ll = logpdf(predicted_obs, y)  # log-likelihood
+    return (filtered_state, ll, predicted_obs)
+end
+
+predicted_state(prev_state::Gaussian, m::MiniKalman.Model, inputs, t::Int) =
+    predicted_state(prev_state, transition_mat(m, inputs, t),
+                    transition_noise(m, inputs, t))
+
 """ Perform one step of Kalman filtering, for online use. We assume equations:
 
 ```julia
@@ -37,36 +66,10 @@ and return this tuple:
 
 To add an "input" term, pass it as `transition_noise = Gaussian(input_term, noise_cov)`.
 """
-function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussian,
-                 observation, observation_mat, observation_noise::Gaussian)
-    # Following Machine Learning, A probabilistic perspective, by Kevin Murphy, 18.3.1.2,
-    # with the exception that I'm setting the forcing term to 0, but allowing noise terms
-    # with means (without loss of generality)
-    # TODO: use keyword arguments on 0.7
-
-    Du, R = parameters(observation_noise)     # Du := Dₜuₜ
-    C = observation_mat
-    y = observation
-
-    # Prediction step (μ_(t|t-1), Σ_(t|t-1))
-    μ, Σ = predicted_state(state_prior, transition_mat, transition_noise) 
-    ŷ = C * μ + Du               # Murphy forgot the Du term in his book
-    S = C * Σ * C' + R
-    predicted_obs = Gaussian(ŷ, S)
-    
-    # Filter
-    K = Σ * C' / S         # Kalman gain matrix
-    r = y - ŷ
-    filtered_state = Gaussian(μ + K*r,
-                              (I - K*C) * Σ)
-    ll = logpdf(predicted_obs, y)  # log-likelihood
-    return (filtered_state, ll, predicted_obs)
-end
-
 kfilter(prev_state::Gaussian, m::MiniKalman.Model, inputs, t::Int, observations=nothing) =
-    kfilter(prev_state, transition_mat(m, inputs, t), transition_noise(m, inputs, t),
-            observations===nothing ? observation(inputs, t) : observations[t],
-            observation_mat(m, inputs, t), observation_noise(m, inputs, t))
+    kfilter_obs(predicted_state(prev_state, m, inputs, t),
+                observations===nothing ? observation(inputs, t) : observations[t],
+                observation_mat(m, inputs, t), observation_noise(m, inputs, t))
 
 """ (Internal function) return three vectors, appropriate for storing 
 states, likelihoods, and P(observation). """
