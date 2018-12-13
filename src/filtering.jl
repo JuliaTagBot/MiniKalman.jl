@@ -45,7 +45,6 @@ function kfilter(state_prior::Gaussian, transition_mat, transition_noise::Gaussi
     # TODO: use keyword arguments on 0.7
 
     Du, R = parameters(observation_noise)     # Du := Dₜuₜ
-    A = transition_mat
     C = observation_mat
     y = observation
 
