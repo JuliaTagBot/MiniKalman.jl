@@ -24,6 +24,20 @@ predicted_state(prev_state::Gaussian, m::MiniKalman.Model, inputs, t::Int) =
     predicted_state(prev_state, transition_mat(m, inputs, t),
                     transition_noise(m, inputs, t))
 
+function predicted_observation(state::Gaussian, observation_mat, observation_noise)
+    # Prediction step (μ_(t|t-1), Σ_(t|t-1))
+    C = observation_mat
+    Du, R = observation_noise     # Du := Dₜuₜ
+    μ, Σ = state 
+    ŷ = C * μ + Du               # Murphy forgot the Du term in his book
+    S = C * Σ * C' + R
+    return Gaussian(ŷ, S)
+end
+
+predicted_observation(state::Gaussian, m::MiniKalman.Model, inputs, t::Int) =
+    predicted_observation(state, observation_mat(m, inputs, t),
+                          observation_noise(m, inputs, t))
+
 function kfilter_obs(state::Gaussian,
                      observation, observation_mat, observation_noise::Gaussian,
                      skip_obs)
@@ -31,15 +45,12 @@ function kfilter_obs(state::Gaussian,
     # with the exception that I'm setting the forcing term to 0, but allowing noise terms
     # with means (without loss of generality)
 
-    Du, R = observation_noise     # Du := Dₜuₜ
     C = observation_mat
     y = observation
-
-    # Prediction step (μ_(t|t-1), Σ_(t|t-1))
     μ, Σ = state 
-    ŷ = C * μ + Du               # Murphy forgot the Du term in his book
-    S = C * Σ * C' + R
-    predicted_obs = Gaussian(ŷ, S)
+
+    ŷ, S = predicted_obs = 
+        predicted_observation(state, observation_mat, observation_noise)
     
     # Filter
     K = Σ * C' / S         # Kalman gain matrix
