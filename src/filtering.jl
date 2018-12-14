@@ -39,8 +39,7 @@ predicted_observation(state::Gaussian, m::MiniKalman.Model, inputs, t::Int) =
                           observation_noise(m, inputs, t))
 
 function kfilter_obs(state::Gaussian,
-                     observation, observation_mat, observation_noise::Gaussian,
-                     skip_obs)
+                     observation, observation_mat, observation_noise::Gaussian)
     # Following Machine Learning, A probabilistic perspective, by Kevin Murphy, 18.3.1.2,
     # with the exception that I'm setting the forcing term to 0, but allowing noise terms
     # with means (without loss of generality)
@@ -58,9 +57,7 @@ function kfilter_obs(state::Gaussian,
     filtered_state = Gaussian(μ + K*r,
                               (I - K*C) * Σ)
     ll = logpdf(predicted_obs, y)  # log-likelihood
-    return (skip_obs ?
-            (state, zero(ll), predicted_obs) :
-            (filtered_state, ll, predicted_obs))
+    return (filtered_state, ll, predicted_obs)
 end
 
 
@@ -81,12 +78,21 @@ and return this tuple:
 
 To add an "input" term, pass it as `transition_noise = Gaussian(input_term, noise_cov)`.
 """
-kfilter(prev_state::Gaussian, m::MiniKalman.Model, inputs, t::Int, observations=nothing) =
-    kfilter_obs(predicted_state(prev_state, m, inputs, t),
-                observations===nothing ? observation(inputs, t) : observations[t],
-                observation_mat(m, inputs, t), observation_noise(m, inputs, t),
-                skip_observation(m, inputs, t))
-        
+function kfilter(prev_state::Gaussian, m::MiniKalman.Model, inputs, t::Int,
+                 observations=nothing)
+    state = predicted_state(prev_state, m, inputs, t)
+    if skip_observation(m, inputs, t)
+        # Optimization note: returning ll=0.0 might make this function type-unstable when
+        # computing gradients, for gradient descent.
+        # We can't have `kfilter_obs` run when `skip_observation` is true, because
+        # bad matrices (singular / containing missing) can trigger exceptions.
+        (state, 0.0, predicted_observation(state, m, inputs, t))
+    else
+        kfilter_obs(state,
+                    observations===nothing ? observation(inputs, t) : observations[t],
+                    observation_mat(m, inputs, t), observation_noise(m, inputs, t))
+    end
+end
 
 """ (Internal function) return three vectors, appropriate for storing 
 states, likelihoods, and P(observation). """
