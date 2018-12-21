@@ -38,12 +38,14 @@ function kalman_smoother!(out, m::Model, inputs, filtered_states;
     return out
 end
 
-""" Compute the smoothed estimates given the filtered estimates. """
-function kalman_smoother(m::Model, inputs, filtered_states::AbstractVector{<:Gaussian})
+""" Compute the smoothed estimates. Optionally, you can pass the filtered estimates
+to save their computation cost. """
+function kalman_smoother(m::Model, inputs, observations=nothing;
+                         initial_state=initial_state(m),
+                         filtered_states::AbstractVector=
+                         kalman_filtered(m, inputs, observations;
+                                         initial_state=initial_state)) 
     smoothed_states = fill(filtered_states[end], length(filtered_states))
     kalman_smoother!(smoothed_states, m, inputs, filtered_states)
     return smoothed_states
 end
-kalman_smoother(m::Model, inputs, observations=nothing; initial_state=initial_state(m)) =
-    kalman_smoother(m, inputs, kalman_filtered(m, inputs, observations;
-                                               initial_state=initial_state))
