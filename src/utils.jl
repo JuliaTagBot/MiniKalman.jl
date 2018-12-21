@@ -73,7 +73,7 @@ Base.:\(A::StaticArrays.SArray{Tuple{1,1},<:Any,2,1},
 
 # TODO: use GaussianDistributions.conditional? Would be slower.
 marginal_var(g::Gaussian) = diag(cov(g))
-marginal_var(g::Gaussian, i::Int) = diag(cov(g))[i]
+marginal_var(g::Gaussian, i::Int) = cov(g) isa Number ? cov(g)[i] : diag(cov(g))[i]
 marginal_std(args...) = sqrt(marginal_var(args...))
 marginal(g::Gaussian, i::Int) = Gaussian(mean(g)[i], marginal_var(g, i))
 is_marginal(g::Gaussian) = dim(g) == 1  # a bit wonky
