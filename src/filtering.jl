@@ -13,6 +13,7 @@ function observation_noise end  # necessary for all models
 function observation end        # optional; you can pass `observations=...` instead
 function initial_state end      # optional; you can pass `initial_state=...` instead
 function labels end             # for pretty-printing
+parameters(m::M) where M<:Model = fieldnames(M)
 
 ################################################################################
 

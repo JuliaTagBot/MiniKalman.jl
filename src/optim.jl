@@ -44,20 +44,27 @@ get_params(model::Model, names=fieldnames(typeof(model))) =
 
 split_units(vec::Vector) = ustrip.(vec), unit.(vec)
 
+# get_inputs is to handle `inputs` that are Functions. It's useful when the inputs
+# includes model-parameter-dependent quantities (eg. for speed). It's not a very
+# nice separation of concerns, though. There might be a better way to arrange things.
+get_inputs(model, inputs::Function) = inputs(model)
+get_inputs(model, inputs) = inputs
+
 """ Finds a set of model parameters that attempts to maximize the log-likelihood
 on the given dataset. Returns `(best_model, optim_output_object)`. """
 function Optim.optimize(model0::Model, inputs,
                         observations::Union{Nothing, AbstractVector}=nothing;
                         initial_state=MiniKalman.initial_state(model0),
                         min=0.0, # 0.0 is arbitrary... see below
-                        parameters_to_optimize=fieldnames(typeof(model0)), 
+                        parameters_to_optimize=parameters(model0), 
                         method=LBFGS(linesearch=Optim.LineSearches.BackTracking()),
                         kwargs...)
     # It would be nice not to need split_units
     initial_x, units = split_units(get_params(model0, parameters_to_optimize))
     function objective(params)
         model = set_params(model0, params .* units, parameters_to_optimize)
-        return -log_likelihood(model, inputs, observations; initial_state=initial_state)
+        return -log_likelihood(model, get_inputs(model, inputs), observations;
+                               initial_state=initial_state)
     end
     td = OnceDifferentiable(objective, initial_x; autodiff=:forward)
     # Tell Optim that no parameter can be below `mins`. This should be made optional, TODO
