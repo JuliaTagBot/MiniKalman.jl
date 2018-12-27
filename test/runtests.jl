@@ -9,6 +9,7 @@ end
 MiniKalman.observation_noise(rw::RandomWalk, _, _) = white_noise1(rw.obs_noise)
 MiniKalman.transition_noise(rw::RandomWalk, _, _) = white_noise1(rw.step_size)
 MiniKalman.initial_state(rw::RandomWalk) = white_noise1(0.5) # centered around 0
+MiniKalman.nobservations(rw::RandomWalk, _) = 1
 
 # Check that sampling from the true model, then inferring the parameters of RandomWalk
 # through maximum likelihood applied to that sample, yields the true model.

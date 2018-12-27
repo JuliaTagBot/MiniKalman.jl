@@ -62,7 +62,7 @@ function sample_and_recover(true_model::Model, inputs, N=nothing; rng=GLOBAL_RNG
                             input_f=(model, inp)->inp)
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
     inputs2 = get_inputs(true_model, inputs)
-    N = N === nothing ? length(inputs2) : inputs
+    N = N === nothing ? length(inputs2) : N
     true_samples, obs =
         kalman_sample(true_model, inputs2, rng, rand(rng, initial_state), N)
     log_likelihood(true_model, inputs2, obs)
