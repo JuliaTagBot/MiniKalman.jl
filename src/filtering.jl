@@ -8,10 +8,13 @@ abstract type Model end
 transition_mat(m::Model, inputs, i) = Identity()
 transition_noise(m::Model, inputs, i) = no_noise()
 observation_mat(m::Model, inputs, i) = Identity()
-skip_observation(m::Model, inputs, i) = false
 function observation_noise end  # necessary for all models
 function observation end        # optional; you can pass `observations=...` instead
 function initial_state end      # optional; you can pass `initial_state=...` instead
+
+# More exotic model functions
+skip_observation(m::Model, inputs, i) = false
+nobservations(m::Model, inputs) = size(observation_mat(m, inputs, 1), 1) #fails if skipped
 function labels end             # for pretty-printing
 parameters(m::M) where M<:Model = fieldnames(M)
 
@@ -95,19 +98,23 @@ function kfilter(prev_state::Gaussian, m::MiniKalman.Model, inputs, t::Int,
     end
 end
 
+function prediction_type(m::Model, inputs, any_state::Gaussian)
+    # This juggling is necessary to get the proper `SVector/Vector` output
+    # type. It's lame, but I don't see how else to do it (except maybe using `accumulate`,
+    # but IIRC there were some performance concerns)
+    fake_obs_mat = hcat((mean(any_state) for _ in 1:nobservations(m, inputs))...)'
+    fake_obs = fake_obs_mat * mean(any_state)
+    return Gaussian{typeof(fake_obs), typeof(fake_obs*fake_obs')}
+end
+
 """ (Internal function) return three vectors, appropriate for storing 
 states, likelihoods, and P(observation). """
-function output_vectors(m::Model, inputs, observations=nothing; length=length(inputs),
-                        initial_state=initial_state(m))
+function output_vectors(m::Model, inputs, observations=nothing; length=length(inputs))
     # Note: this function was split off for our own internal purposes (switching states)
     # It could be merged back into `kalman_filter!`, I suppose.
-    state = make_full(initial_state)
-    # The type of the state might change after one round of Kalman filtering,
-    # so for type-stability reasons, we have to fake-run it once. It's a bit lame.
-    state2, _, dum_predictive = kfilter(state, m, inputs, 1, observations)
-    @assert typeof(state) == typeof(state2)
+    state = make_full(initial_state(m))
     filtered_states = Vector{typeof(state)}(undef, length)
-    predicted_obs = Vector{typeof(dum_predictive)}(undef, length)
+    predicted_obs = Vector{prediction_type(m, inputs, state)}(undef, length)
     lls = Vector{Float64}(undef, length)
     return (filtered_states, lls, predicted_obs)
 end
