@@ -133,7 +133,6 @@ function kalman_filter!(filtered_states::AbstractVector, lls::AbstractVector,
         state, lls[t], predicted_obs[t] = kfilter(state, m, inputs, t, observations)
         filtered_states[t] = state
     end
-    filtered_states
 end
 
 function kalman_filter(m::Model, inputs, observations=nothing;
