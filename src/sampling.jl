@@ -58,8 +58,7 @@ function sample_and_recover(true_model::Model, inputs, N=nothing; rng=GLOBAL_RNG
                             parameters_to_optimize=parameters(true_model),
                             fuzz_factor=exp.(randn(rng, length(get_params(true_model, parameters_to_optimize)))),
                             initial_state::Gaussian=initial_state(true_model),
-                            start_model=nothing,
-                            input_f=(model, inp)->inp)
+                            start_model=nothing)
     rng = rng isa AbstractRNG ? rng : MersenneTwister(rng::Integer)
     inputs2 = get_inputs(true_model, inputs)
     N = N === nothing ? length(inputs2) : N
