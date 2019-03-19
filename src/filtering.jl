@@ -158,6 +158,7 @@ function log_likelihood(m::Model, inputs, observations=nothing;
 end
 
 kalman_filtered(args...; kwargs...) = kalman_filter(args...; kwargs...)[1]  # convenience
+kalman_predicted(args...; kwargs...) = kalman_filter(args...; kwargs...)[3]  # convenience
 
 """ Convenience; returns a vector of the total likelihood up to each step. """
 cumulative_log_likelihood(args...; kwargs...) =

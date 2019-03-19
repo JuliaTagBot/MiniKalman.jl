@@ -16,7 +16,7 @@ using DocStringExtensions
 
 export kfilter, kalman_filter, white_noise1, white_noise2,
     kalman_smoother, kalman_sample, no_noise, log_likelihood, cumulative_log_likelihood,
-    sample_and_recover, optimize, marginal
+    sample_and_recover, optimize, marginal, kalman_predicted, kalman_filtered
 
 
 include("utils.jl")
